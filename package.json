@@ -15,12 +15,13 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL}",
-    "check:browser": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL} --browser",
-    "check:json": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL} --output json",
-    "check:local": "tsx main.ts --base-url http://localhost:${PORT:-3000} --no-external",
-    "check:verbose": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL} --verbose",
+    "check": "tsx main.ts check --base-url ${BASE_URL:?Set BASE_URL}",
+    "check:browser": "tsx main.ts check --base-url ${BASE_URL:?Set BASE_URL} --browser",
+    "check:json": "tsx main.ts check --base-url ${BASE_URL:?Set BASE_URL} --output json",
+    "check:local": "tsx main.ts check --base-url http://localhost:${PORT:-3000} --no-external",
+    "check:verbose": "tsx main.ts check --base-url ${BASE_URL:?Set BASE_URL} --verbose",
     "lint": "biome check main.ts browser.ts package.json tsconfig.json biome.json",
+    "smoke:compiled": "node dist/main.js --help",
     "smoke:help": "tsx main.ts --help"
   },
   "devDependencies": {

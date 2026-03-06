@@ -11,8 +11,6 @@ on:
         type: string
 
 env:
-  # Set UAT_BASE_URL in GitHub repo secrets for your UAT environment.
-  # Example: https://uat.yoursite.com
   BASE_URL: ${{ inputs.base_url || secrets.UAT_BASE_URL }}
 
 jobs:
@@ -29,12 +27,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build package artifact
-        run: npm run build
-
       - name: Validate BASE_URL is set
         run: |
           if [ -z "$BASE_URL" ]; then
@@ -45,7 +37,7 @@ jobs:
 
       - name: Run uat
         run: |
-          node dist/main.js check \
+          npx --yes __PACKAGE_SPEC__ check \
             --base-url "$BASE_URL" \
             --max-pages 300 \
             --concurrency 5 \
@@ -65,14 +57,8 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build package artifact
-        run: npm run build
-
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx --yes __PLAYWRIGHT_SPEC__ install --with-deps chromium
 
       - name: Validate BASE_URL is set
         run: |
@@ -84,7 +70,7 @@ jobs:
 
       - name: Run uat + browser checks
         run: |
-          node dist/main.js check \
+          npx --yes __PACKAGE_SPEC__ check \
             --base-url "$BASE_URL" \
             --max-pages 300 \
             --concurrency 5 \

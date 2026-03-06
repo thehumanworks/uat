@@ -7,12 +7,11 @@
 
 ## Status Summary
 
-- Active tasks: 2
-- Completed tasks: 7
+- Active tasks: 1
+- Completed tasks: 8
 
 ## Active Tasks
 
-- [`todo/02-package-cli-and-installers.md`](todo/02-package-cli-and-installers.md)
 - [`todo/03-publish-first-release.md`](todo/03-publish-first-release.md)
 
 ## Completed Tasks
@@ -24,3 +23,4 @@
 - [`done/05-tune-browser-dead-element-detection.md`](done/05-tune-browser-dead-element-detection.md)
 - [`done/06-reduce-non-html-download-cost.md`](done/06-reduce-non-html-download-cost.md)
 - [`done/07-establish-release-baseline.md`](done/07-establish-release-baseline.md)
+- [`done/08-package-cli-and-installers.md`](done/08-package-cli-and-installers.md)

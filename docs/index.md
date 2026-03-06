@@ -16,13 +16,14 @@ This repository documents `uat`, short for UI Automated Testing, using a docs-fi
 
 ## Current State
 
-- Milestone 1 of the npm release plan is complete and archived in `docs/tasks/done/07-establish-release-baseline.md`.
-- Active release work is tracked in `docs/EXECPLAN.md` and `docs/tasks/todo/`.
+- Milestones 1 and 2 of the npm release plan are complete and archived in `docs/tasks/done/`.
+- One active release task remains under `docs/tasks/todo/`: publish and verify `@nothumanwork/uat@1.0.0`.
 - The completed stabilization backlog remains archived under `docs/tasks/done/`.
 
 ## Verification Baseline
 
 Run from the repository root:
 
-    bun main.ts --help
-    bun main.ts --base-url https://example.com --no-external --max-pages 1 --output json
+    npm run lint
+    npm run build
+    npm run smoke:help

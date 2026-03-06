@@ -32,10 +32,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package artifact
+        run: npm run build
 
       - name: Validate BASE_URL is set
         run: |
@@ -51,7 +57,7 @@ jobs:
       - name: Run uat
         run: |
           echo "Checking: $BASE_URL"
-          bun main.ts \
+          node dist/main.js check \
             --base-url "$BASE_URL" \
             --max-pages 300 \
             --concurrency 5 \
@@ -67,10 +73,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package artifact
+        run: npm run build
 
       - name: Validate BASE_URL is set
         run: |
@@ -80,7 +92,7 @@ jobs:
           fi
 
       - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Wait for deployment to stabilize
         if: github.event_name == 'deployment_status'
@@ -89,7 +101,7 @@ jobs:
       - name: Run uat + browser checks
         run: |
           echo "Checking: $BASE_URL"
-          bun main.ts \
+          node dist/main.js check \
             --base-url "$BASE_URL" \
             --max-pages 300 \
             --concurrency 5 \

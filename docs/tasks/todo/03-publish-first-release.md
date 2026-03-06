@@ -33,12 +33,20 @@ Run from the repository root:
     npm run lint
     npm run build
     npm pack
-    npm publish --access public
+    tar -tf nothumanwork-uat-1.0.0.tgz
+
+    tmp_npmrc=$(mktemp)
+    printf '//registry.npmjs.org/:_authToken=%s\n' "$NODE_AUTH_TOKEN" > "$tmp_npmrc"
+    NPM_CONFIG_USERCONFIG="$tmp_npmrc" npm publish --dry-run --access public
+    NPM_CONFIG_USERCONFIG="$tmp_npmrc" npm publish --access public
+    rm -f "$tmp_npmrc"
+
+    npm view @nothumanwork/uat version
     npx @nothumanwork/uat@1.0.0 --help
 
-Success means the tarball is created, the publish succeeds, and the registry-backed help command prints the package CLI usage.
+Success means the tarball contains the compiled runtime plus templates, the dry run succeeds, the real publish succeeds, `npm view` returns `1.0.0`, and the registry-backed help command prints the package CLI usage.
 
 ## Completion Notes
 
 - Status: pending
-- Blocking dependencies: `02-package-cli-and-installers.md`
+- Blocking dependencies: packaging completed in `../done/08-package-cli-and-installers.md`

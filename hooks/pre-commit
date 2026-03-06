@@ -45,6 +45,13 @@ if [ "${LINK_CHECK_BROWSER:-}" = "1" ] || [ "${LINK_CHECK_BROWSER:-}" = "true" ]
   BROWSER_FLAG="--browser"
 fi
 MAIN_SCRIPT="${REPO_ROOT}/main.ts"
+TSX_BIN="${REPO_ROOT}/node_modules/.bin/tsx"
+
+if [ ! -x "${TSX_BIN}" ]; then
+  echo "[uat] Missing runtime dependency: ${TSX_BIN}"
+  echo "[uat] Run npm install from ${REPO_ROOT} and retry."
+  exit 1
+fi
 
 # Check if dev server is running
 if ! curl -s --head --connect-timeout 2 "http://localhost:${PORT}" > /dev/null 2>&1; then
@@ -54,7 +61,7 @@ if ! curl -s --head --connect-timeout 2 "http://localhost:${PORT}" > /dev/null 2
 fi
 
 echo "[uat] Checking local site on port ${PORT} (max ${MAX_PAGES} pages${BROWSER_FLAG:+, browser checks enabled})..."
-if ! bun "${MAIN_SCRIPT}" \
+if ! "${TSX_BIN}" "${MAIN_SCRIPT}" check \
   --base-url "http://localhost:${PORT}" \
   --max-pages "${MAX_PAGES}" \
   --no-external \

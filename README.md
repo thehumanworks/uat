@@ -6,16 +6,36 @@
 
 ```bash
 # 1. Install dependencies
-bun install
+npm install
 
 # 2. (Optional) Install Playwright for browser checks
-bunx playwright install --with-deps chromium
+npx playwright install --with-deps chromium
 
-# 3. (Optional) Install pre-commit hook
+# 3. (Optional) Install the repo-local pre-commit hook while developing this package
 ./setup-hooks.sh install
 ```
 
-Requires [Bun](https://bun.sh). Playwright is only needed for `--browser` mode.
+Requires Node 20+. Playwright is only needed for `--browser` mode.
+
+## Package Usage
+
+Run the published CLI without cloning this repository:
+
+```bash
+# HTTP-only check
+npx @nothumanwork/uat check --base-url https://yoursite.com
+
+# HTTP + browser check
+npx @nothumanwork/uat check --base-url https://yoursite.com --browser
+
+# Install the managed pre-commit hook into the current Git repo
+npx @nothumanwork/uat init hooks
+
+# Install the managed GitHub Actions workflows into the current project
+npx @nothumanwork/uat init github
+```
+
+The installer commands refuse to overwrite files with different content unless you pass `--force`. Use `--dry-run` to preview the writes.
 
 ## Documentation Layout
 
@@ -28,19 +48,37 @@ Requires [Bun](https://bun.sh). Playwright is only needed for `--browser` mode.
 
 ```bash
 # HTTP-only check (fast)
-bun main.ts --base-url https://yoursite.com
+uat check --base-url https://yoursite.com
 
 # HTTP + browser check (thorough)
-bun main.ts --base-url https://yoursite.com --browser
+uat check --base-url https://yoursite.com --browser
 
 # Local dev server
-bun main.ts --base-url http://localhost:3000 --no-external
+uat check --base-url http://localhost:3000 --no-external
 
 # CI mode (exit 1 on failure)
-bun main.ts --base-url https://yoursite.com --exit-on-failure
+uat check --base-url https://yoursite.com --exit-on-failure
 ```
 
-`--base-url` is required. You can also set it via the `BASE_URL` env var.
+`--base-url` is required. You can also set it via the `BASE_URL` env var. For backwards compatibility, `uat --base-url ...` is treated the same as `uat check --base-url ...`.
+
+## Commands
+
+### `uat check`
+
+Runs the crawler and optional browser checks.
+
+### `uat init hooks`
+
+Installs a managed pre-commit hook into the current Git repository. The generated hook prefers a locally installed `uat` binary from `node_modules/.bin/uat` and falls back to `npx --yes @nothumanwork/uat@<version>`.
+
+### `uat init github`
+
+Installs `.github/workflows/uat-link-check.yml` and `.github/workflows/uat-post-deploy-link-check.yml` into the current project.
+
+### `uat init all`
+
+Installs both the pre-commit hook and the GitHub workflows in one command.
 
 ## Configuration reference
 
@@ -58,6 +96,11 @@ bun main.ts --base-url https://yoursite.com --exit-on-failure
 | `--entry-points <urls>` | -- | Comma-separated extra paths to seed the crawl |
 | `--exit-on-failure` | off | Exit with code 1 on any broken link or browser issue |
 | `--browser` | off | Run Playwright browser checks after HTTP crawl |
+| `init hooks --dry-run` | off | Preview the generated pre-commit hook without writing it |
+| `init hooks --force` | off | Replace an existing conflicting pre-commit hook |
+| `init github --dry-run` | off | Preview the generated workflow files without writing them |
+| `init github --force` | off | Replace existing conflicting workflow files |
+| `init all --cwd <path>` | current directory | Install into a specific project root |
 
 ### Environment variables
 
@@ -76,11 +119,14 @@ bun main.ts --base-url https://yoursite.com --exit-on-failure
 
 | Script | What it does | Requires |
 |--------|-------------|----------|
-| `bun run check` | HTTP check | `BASE_URL` |
-| `bun run check:local` | HTTP check against localhost | `PORT` (default 3000) |
-| `bun run check:browser` | HTTP + browser check | `BASE_URL`, Playwright |
-| `bun run check:verbose` | HTTP check, verbose output | `BASE_URL` |
-| `bun run check:json` | HTTP check, JSON output | `BASE_URL` |
+| `npm run check` | HTTP check | `BASE_URL` |
+| `npm run check:local` | HTTP check against localhost | `PORT` (default 3000) |
+| `npm run check:browser` | HTTP + browser check | `BASE_URL`, Playwright |
+| `npm run check:verbose` | HTTP check, verbose output | `BASE_URL` |
+| `npm run check:json` | HTTP check, JSON output | `BASE_URL` |
+| `npm run build` | Compile the publishable CLI into `dist/` | TypeScript |
+| `npm run lint` | Lint source and package metadata | Biome |
+| `npm run smoke:help` | Print the source CLI help via `tsx` | `tsx` |
 
 ## What it checks
 
@@ -114,7 +160,12 @@ Both files are written on every run. The `reports/` directory is gitignored.
 
 ## Pre-commit hook
 
-Runs the uat HTTP checker against your local dev server before each commit. Skips cleanly if the dev server is not running.
+There are two supported hook flows:
+
+- Repository development: `./setup-hooks.sh install` installs the source-repo hook from this checkout.
+- Downstream project setup: `npx @nothumanwork/uat init hooks` installs the packaged hook into the target repo.
+
+Both hook variants run the uat HTTP checker against your local dev server before each commit and skip cleanly if the dev server is not running.
 
 ```bash
 ./setup-hooks.sh install    # install
@@ -140,16 +191,18 @@ Triggers on PRs to `main`/`master` and manual dispatch. Set `UAT_BASE_URL` in Gi
 
 | Job | Timeout | What it does |
 |-----|---------|--------------|
-| Link check | 5 min | HTTP crawl only, exits 1 on failure |
-| Browser check | 15 min | HTTP crawl + Playwright, exits 1 on failure |
+| Link check | 5 min | `node dist/main.js check`, exits 1 on failure |
+| Browser check | 15 min | `node dist/main.js check --browser`, exits 1 on failure |
 
-### `post-deploy-link-check.yml`
+### `uat-post-deploy-link-check.yml`
 
 Triggers on successful deployments, manual dispatch, and `workflow_call`. Set `PROD_BASE_URL` in GitHub Secrets. Waits 10s after deployment before checking.
 
 | Job | Timeout | What it does |
 |-----|---------|--------------|
-| Link check | 5 min | HTTP crawl only, exits 1 on failure |
-| Browser check | 15 min | HTTP crawl + Playwright, exits 1 on failure |
+| Link check | 5 min | `node dist/main.js check`, exits 1 on failure |
+| Browser check | 15 min | `node dist/main.js check --browser`, exits 1 on failure |
+
+The packaged installer writes workflow files with the same names into downstream projects, but they execute the published package through `npx --yes @nothumanwork/uat@<version>` instead of relying on a repository checkout.
 
 Both jobs run in parallel in each workflow. Both workflows accept a `base_url` dispatch input to override the secret for manual runs.

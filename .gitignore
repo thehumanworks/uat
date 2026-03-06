@@ -34,6 +34,7 @@ coverage/
 *.tsbuildinfo
 *.js.map
 *.d.ts.map
+*.tgz
 
 # Package manager caches and lockfiles generated locally
 .npm/

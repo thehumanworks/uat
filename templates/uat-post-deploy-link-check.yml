@@ -1,0 +1,94 @@
+name: Post-Deploy uat
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override base URL to check"
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      base_url:
+        description: "Base URL to check"
+        required: false
+        type: string
+
+env:
+  BASE_URL: ${{ inputs.base_url || secrets.PROD_BASE_URL }}
+
+jobs:
+  link-check:
+    name: uat check (production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate BASE_URL is set
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::BASE_URL is not set. Configure PROD_BASE_URL in GitHub Secrets or provide it via workflow_dispatch."
+            exit 1
+          fi
+
+      - name: Wait for deployment to stabilize
+        if: github.event_name == 'deployment_status'
+        run: sleep 10
+
+      - name: Run uat
+        run: |
+          echo "Checking: $BASE_URL"
+          npx --yes __PACKAGE_SPEC__ check \
+            --base-url "$BASE_URL" \
+            --max-pages 300 \
+            --concurrency 5 \
+            --verbose \
+            --exit-on-failure
+
+  browser-check:
+    name: uat browser check (production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate BASE_URL is set
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::BASE_URL is not set. Configure PROD_BASE_URL in GitHub Secrets or provide it via workflow_dispatch."
+            exit 1
+          fi
+
+      - name: Install Playwright browsers
+        run: npx --yes __PLAYWRIGHT_SPEC__ install --with-deps chromium
+
+      - name: Wait for deployment to stabilize
+        if: github.event_name == 'deployment_status'
+        run: sleep 10
+
+      - name: Run uat + browser checks
+        run: |
+          echo "Checking: $BASE_URL"
+          npx --yes __PACKAGE_SPEC__ check \
+            --base-url "$BASE_URL" \
+            --max-pages 300 \
+            --concurrency 5 \
+            --verbose \
+            --exit-on-failure \
+            --browser

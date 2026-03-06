@@ -8,3 +8,5 @@ All task specs in this directory represent completed work and remain here as the
 - [`04-improve-html-link-extraction.md`](04-improve-html-link-extraction.md)
 - [`05-tune-browser-dead-element-detection.md`](05-tune-browser-dead-element-detection.md)
 - [`06-reduce-non-html-download-cost.md`](06-reduce-non-html-download-cost.md)
+- [`07-establish-release-baseline.md`](07-establish-release-baseline.md)
+- [`08-package-cli-and-installers.md`](08-package-cli-and-installers.md)

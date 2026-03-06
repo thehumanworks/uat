@@ -1,11 +1,11 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 /**
  * uat (UI Automated Testing) — crawls from a base URL, follows internal links,
  * and reports broken links (404s, 5xx, timeouts).
  *
  * Usage:
- *   bun main.ts [options]
+ *   uat check [options]
  *
  * Options:
  *   --base-url <url>      Base URL to crawl (required, or set BASE_URL env var)
@@ -22,9 +22,18 @@
  *   - CI:     logged to worker output + $GITHUB_STEP_SUMMARY
  */
 
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { BrowserCheckResult, BrowserIssue } from "./browser";
+import { execFileSync } from "node:child_process";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { BrowserCheckResult, BrowserIssue } from "./browser.js";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -40,6 +49,19 @@ interface Config {
   exitOnFailure: boolean;
   browser: boolean;
 }
+
+type InitTarget = "hooks" | "github" | "all";
+
+interface InitConfig {
+  cwd: string;
+  dryRun: boolean;
+  force: boolean;
+  target: InitTarget;
+}
+
+type Command =
+  | { kind: "check"; args: string[] }
+  | { kind: "init"; config: InitConfig };
 
 interface BrokenLink {
   url: string;
@@ -57,6 +79,19 @@ interface CrawlResult {
   browserIssues?: BrowserIssue[];
   browserPagesChecked?: number;
   durationMs: number;
+}
+
+interface PackageMetadata {
+  name: string;
+  version: string;
+  dependencies?: Record<string, string>;
+}
+
+interface PlannedWrite {
+  executable?: boolean;
+  label: string;
+  path: string;
+  content: string;
 }
 
 // ── ANSI helpers ────────────────────────────────────────────────────
@@ -78,8 +113,121 @@ function exitWithCliError(message: string): never {
   process.exit(1);
 }
 
-function parseArgs(): Config {
-  const args = process.argv.slice(2);
+function readFlagValue(args: string[], index: number, flag: string): string {
+  const value = args[index + 1];
+  if (value == null || value.startsWith("--")) {
+    exitWithCliError(`${flag} requires a value.`);
+  }
+  return value;
+}
+
+function printRootHelp(): void {
+  console.log(
+    [
+      "Usage:",
+      "  uat check [options]",
+      "  uat init hooks [--dry-run] [--force] [--cwd <path>]",
+      "  uat init github [--dry-run] [--force] [--cwd <path>]",
+      "  uat init all [--dry-run] [--force] [--cwd <path>]",
+      "",
+      "Commands:",
+      "  check        Crawl a site and report broken links or browser-visible issues",
+      "  init hooks   Install the managed pre-commit hook into the target Git repo",
+      "  init github  Install managed GitHub Actions workflow files",
+      "  init all     Install both the hook and workflow files",
+      "",
+      "Compatibility:",
+      "  `uat --base-url https://example.com` still works and is treated as `uat check ...`.",
+      "",
+      "Run `uat check --help` for the checker flags.",
+    ].join("\n"),
+  );
+}
+
+function printInitHelp(target: InitTarget): void {
+  console.log(
+    [
+      `Usage: uat init ${target} [--dry-run] [--force] [--cwd <path>]`,
+      "",
+      "Options:",
+      "  --dry-run   Print the files that would be written without changing anything",
+      "  --force     Overwrite managed files when the existing content differs",
+      "  --cwd       Project root to install into (defaults to the current directory)",
+    ].join("\n"),
+  );
+}
+
+function parseInitArgs(target: InitTarget, args: string[]): InitConfig {
+  const config: InitConfig = {
+    cwd: process.cwd(),
+    dryRun: false,
+    force: false,
+    target,
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--cwd":
+        config.cwd = resolve(readFlagValue(args, i, "--cwd"));
+        i++;
+        break;
+      case "--dry-run":
+        config.dryRun = true;
+        break;
+      case "--force":
+        config.force = true;
+        break;
+      case "--help":
+        printInitHelp(target);
+        process.exit(0);
+        return config;
+      default:
+        exitWithCliError(
+          `Unknown option for \`uat init ${target}\`: ${args[i]}.`,
+        );
+    }
+  }
+
+  return config;
+}
+
+function parseCommand(args: string[]): Command {
+  const [first, second, ...rest] = args;
+
+  if (first == null) {
+    printRootHelp();
+    process.exit(0);
+  }
+
+  if (first === "--help" || first === "help") {
+    printRootHelp();
+    process.exit(0);
+  }
+
+  if (first === "check") {
+    return { kind: "check", args: args.slice(1) };
+  }
+
+  if (first === "init") {
+    if (second == null || !["hooks", "github", "all"].includes(second)) {
+      exitWithCliError(
+        "Usage: uat init <hooks|github|all> [--dry-run] [--force] [--cwd <path>].",
+      );
+    }
+    return {
+      kind: "init",
+      config: parseInitArgs(second as InitTarget, rest),
+    };
+  }
+
+  if (first.startsWith("--")) {
+    return { kind: "check", args };
+  }
+
+  exitWithCliError(`Unknown command: ${first}. Run \`uat --help\`.`);
+}
+
+function parseCheckArgs(args: string[]): Config {
   const config: Config = {
     baseUrl: process.env.BASE_URL ?? "",
     maxPages: 300,
@@ -95,16 +243,8 @@ function parseArgs(): Config {
     browser: false,
   };
 
-  const readFlagValue = (index: number, flag: string): string => {
-    const value = args[index + 1];
-    if (value == null || value.startsWith("--")) {
-      exitWithCliError(`${flag} requires a value.`);
-    }
-    return value;
-  };
-
   const parsePositiveIntegerFlag = (index: number, flag: string): number => {
-    const raw = readFlagValue(index, flag);
+    const raw = readFlagValue(args, index, flag);
     const value = Number(raw);
     if (!Number.isInteger(value) || value <= 0) {
       exitWithCliError(
@@ -117,7 +257,7 @@ function parseArgs(): Config {
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case "--base-url":
-        config.baseUrl = readFlagValue(i, "--base-url");
+        config.baseUrl = readFlagValue(args, i, "--base-url");
         i++;
         break;
       case "--max-pages":
@@ -139,11 +279,13 @@ function parseArgs(): Config {
         config.verbose = true;
         break;
       case "--output":
-        config.outputFormat = readFlagValue(i, "--output") as "text" | "json";
+        config.outputFormat = readFlagValue(args, i, "--output") as
+          | "text"
+          | "json";
         i++;
         break;
       case "--entry-points":
-        config.entryPoints = readFlagValue(i, "--entry-points")
+        config.entryPoints = readFlagValue(args, i, "--entry-points")
           .split(",")
           .map((p) => p.trim())
           .filter(Boolean);
@@ -158,7 +300,7 @@ function parseArgs(): Config {
       case "--help":
         console.log(
           [
-            "Usage: bun main.ts [options]",
+            "Usage: uat check [options]",
             "",
             "Options:",
             "  --base-url <url>      Base URL to crawl (required, or set BASE_URL env var)",
@@ -171,6 +313,9 @@ function parseArgs(): Config {
             "  --entry-points <urls> Comma-separated extra paths to seed the crawl",
             "  --exit-on-failure     Exit with code 1 if broken links found (env: EXIT_ON_FAILURE=1)",
             "  --browser             Run Playwright browser checks (console errors, broken images, dead UI)",
+            "",
+            "Compatibility:",
+            "  `uat --base-url https://example.com` is treated the same as `uat check --base-url https://example.com`.",
           ].join("\n"),
         );
         process.exit(0);
@@ -627,6 +772,168 @@ function countBroken(
   return count;
 }
 
+function resolvePackageRoot(): string {
+  const currentDir = dirname(fileURLToPath(import.meta.url));
+  const candidates = [currentDir, resolve(currentDir, "..")];
+
+  for (const candidate of candidates) {
+    if (existsSync(join(candidate, "package.json"))) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    "Unable to locate the package root from the current entrypoint.",
+  );
+}
+
+function readPackageMetadata(): PackageMetadata {
+  const metadataPath = join(resolvePackageRoot(), "package.json");
+  return JSON.parse(readFileSync(metadataPath, "utf-8")) as PackageMetadata;
+}
+
+function exactVersion(versionRange: string | undefined): string {
+  if (!versionRange) return "latest";
+  return versionRange.replace(/^[^\d]*/, "");
+}
+
+function renderTemplate(templateName: string): string {
+  const packageRoot = resolvePackageRoot();
+  const metadata = readPackageMetadata();
+  const templatePath = join(packageRoot, "templates", templateName);
+  const packageSpec = `${metadata.name}@${metadata.version}`;
+  const playwrightSpec = `playwright@${exactVersion(metadata.dependencies?.playwright)}`;
+
+  const replacements: Record<string, string> = {
+    __PACKAGE_NAME__: metadata.name,
+    __PACKAGE_SPEC__: packageSpec,
+    __PACKAGE_VERSION__: metadata.version,
+    __PLAYWRIGHT_SPEC__: playwrightSpec,
+  };
+
+  let content = readFileSync(templatePath, "utf-8");
+  for (const [token, value] of Object.entries(replacements)) {
+    content = content.replaceAll(token, value);
+  }
+  return content;
+}
+
+function resolveProjectRoot(cwd: string): string {
+  try {
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return cwd;
+  }
+}
+
+function resolveGitHooksDir(cwd: string): string {
+  try {
+    return resolve(
+      cwd,
+      execFileSync("git", ["rev-parse", "--git-path", "hooks"], {
+        cwd,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim(),
+    );
+  } catch {
+    exitWithCliError("`uat init hooks` must be run inside a Git repository.");
+  }
+}
+
+function planWrites(config: InitConfig): PlannedWrite[] {
+  const projectRoot = resolveProjectRoot(config.cwd);
+
+  switch (config.target) {
+    case "hooks":
+      return [
+        {
+          content: renderTemplate("pre-commit"),
+          executable: true,
+          label: "pre-commit hook",
+          path: join(resolveGitHooksDir(config.cwd), "pre-commit"),
+        },
+      ];
+    case "github":
+      return [
+        {
+          content: renderTemplate("uat-link-check.yml"),
+          label: "GitHub workflow",
+          path: join(projectRoot, ".github", "workflows", "uat-link-check.yml"),
+        },
+        {
+          content: renderTemplate("uat-post-deploy-link-check.yml"),
+          label: "GitHub workflow",
+          path: join(
+            projectRoot,
+            ".github",
+            "workflows",
+            "uat-post-deploy-link-check.yml",
+          ),
+        },
+      ];
+    case "all":
+      return [
+        ...planWrites({ ...config, target: "hooks" }),
+        ...planWrites({ ...config, target: "github" }),
+      ];
+  }
+}
+
+function ensureWritable(plan: PlannedWrite, force: boolean): "write" | "skip" {
+  if (!existsSync(plan.path)) {
+    return "write";
+  }
+
+  const existing = readFileSync(plan.path, "utf-8");
+  if (existing === plan.content) {
+    return "skip";
+  }
+
+  if (!force) {
+    exitWithCliError(
+      `Refusing to overwrite ${plan.path}. Re-run with --force to replace it.`,
+    );
+  }
+
+  return "write";
+}
+
+function runInit(config: InitConfig): void {
+  const plans = planWrites(config);
+  const actions = plans.map((plan) => ({
+    plan,
+    action: ensureWritable(plan, config.force),
+  }));
+
+  if (config.dryRun) {
+    console.log(`uat init ${config.target} dry run`);
+    for (const { action, plan } of actions) {
+      const verb = action === "skip" ? "skip" : "write";
+      console.log(`  ${verb.toUpperCase()} ${plan.label}: ${plan.path}`);
+    }
+    return;
+  }
+
+  for (const { action, plan } of actions) {
+    if (action === "skip") {
+      console.log(`Already up to date: ${plan.path}`);
+      continue;
+    }
+
+    mkdirSync(dirname(plan.path), { recursive: true });
+    writeFileSync(plan.path, plan.content, "utf-8");
+    if (plan.executable) {
+      chmodSync(plan.path, 0o755);
+    }
+    console.log(`Installed ${plan.label}: ${plan.path}`);
+  }
+}
+
 // ── Report persistence ──────────────────────────────────────────────
 
 const isCI = !!(process.env.CI || process.env.GITHUB_ACTIONS);
@@ -809,9 +1116,7 @@ function log(config: Config, ...args: unknown[]): void {
   if (config.outputFormat !== "json") console.log(...args);
 }
 
-async function main(): Promise<void> {
-  const config = parseArgs();
-
+async function runCheck(config: Config): Promise<void> {
   log(config, c.bold("uat starting"));
   log(config, `  Target:      ${c.cyan(config.baseUrl)}`);
   log(config, `  Max pages:   ${config.maxPages}`);
@@ -827,7 +1132,7 @@ async function main(): Promise<void> {
     log(config, "");
     log(config, c.bold("Running browser checks (Playwright)..."));
 
-    const { runBrowserChecks } = await import("./browser");
+    const { runBrowserChecks } = await import("./browser.js");
 
     // Filter crawled pages to only those that responded OK (skip 404s etc.)
     const brokenUrls = new Set(result.brokenLinks.map((l) => l.url));
@@ -873,6 +1178,18 @@ async function main(): Promise<void> {
   if ((hasBrokenLinks || hasBrowserIssues) && config.exitOnFailure) {
     process.exit(1);
   }
+}
+
+async function main(): Promise<void> {
+  const command = parseCommand(process.argv.slice(2));
+
+  if (command.kind === "init") {
+    runInit(command.config);
+    return;
+  }
+
+  const config = parseCheckArgs(command.args);
+  await runCheck(config);
 }
 
 main().catch((err) => {
