@@ -22,9 +22,9 @@
  *   - CI:     logged to worker output + $GITHUB_STEP_SUMMARY
  */
 
-import { mkdirSync, writeFileSync, appendFileSync, existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BrowserIssue, BrowserCheckResult } from "./browser";
+import type { BrowserCheckResult, BrowserIssue } from "./browser";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -107,7 +107,9 @@ function parseArgs(): Config {
     const raw = readFlagValue(index, flag);
     const value = Number(raw);
     if (!Number.isInteger(value) || value <= 0) {
-      exitWithCliError(`${flag} must be a positive integer. Received "${raw}".`);
+      exitWithCliError(
+        `${flag} must be a positive integer. Received "${raw}".`,
+      );
     }
     return value;
   };
@@ -291,18 +293,23 @@ function extractUrls(
   // href= and src= attributes (covers <a>, <link>, <img>, <script>, <iframe>, <source>, <video>, <audio>)
   const attrRegex =
     /(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = attrRegex.exec(html)) !== null) {
+  for (
+    let match = attrRegex.exec(html);
+    match !== null;
+    match = attrRegex.exec(html)
+  ) {
     const raw = match[1] ?? match[2] ?? match[3];
     if (!raw) continue;
     addDiscoveredUrl(raw, true);
   }
 
   // Also check srcset (responsive images)
-  const srcsetRegex =
-    /srcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
-  while ((match = srcsetRegex.exec(html)) !== null) {
+  const srcsetRegex = /srcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
+  for (
+    let match = srcsetRegex.exec(html);
+    match !== null;
+    match = srcsetRegex.exec(html)
+  ) {
     const srcset = match[1] ?? match[2] ?? match[3];
     if (!srcset) continue;
     // srcset format: "url 1x, url 2x" or "url 100w, url 200w"
@@ -314,6 +321,19 @@ function extractUrls(
   }
 
   return { toCrawl: [...toCrawl], toCheck: [...toCheck] };
+}
+
+function trackLinkSource(
+  linkSources: Map<string, Set<string>>,
+  url: string,
+  pageUrl: string,
+): void {
+  let sources = linkSources.get(url);
+  if (sources == null) {
+    sources = new Set<string>();
+    linkSources.set(url, sources);
+  }
+  sources.add(pageUrl);
 }
 
 // ── Fetcher with timeout ────────────────────────────────────────────
@@ -464,15 +484,12 @@ async function crawl(config: Config, quiet = false): Promise<CrawlResult> {
             ) {
               crawlQueue.push(url);
             }
-            // Track where this link was found
-            if (!linkSources.has(url)) linkSources.set(url, new Set());
-            linkSources.get(url)!.add(pageUrl);
+            trackLinkSource(linkSources, url, pageUrl);
           }
 
           // Track all links for checking
           for (const url of toCheck) {
-            if (!linkSources.has(url)) linkSources.set(url, new Set());
-            linkSources.get(url)!.add(pageUrl);
+            trackLinkSource(linkSources, url, pageUrl);
           }
         }
       } finally {
@@ -507,7 +524,10 @@ async function crawl(config: Config, quiet = false): Promise<CrawlResult> {
         );
 
         // Some servers reject HEAD — retry with GET if we get 405 or 403
-        if (!shouldFetchBody && (result.status === 405 || result.status === 403)) {
+        if (
+          !shouldFetchBody &&
+          (result.status === 405 || result.status === 403)
+        ) {
           result = await fetchWithTimeout(url, config.timeout, "GET", false);
         }
 
@@ -680,8 +700,8 @@ function buildMarkdownReport(result: CrawlResult): string {
   const lines: string[] = [
     "## Link Check Report",
     "",
-    `| Metric | Value |`,
-    `|--------|-------|`,
+    "| Metric | Value |",
+    "|--------|-------|",
     `| Base URL | ${result.baseUrl} |`,
     `| Pages crawled | ${result.pagesChecked} |`,
     `| Links checked | ${result.linksChecked} |`,
@@ -743,7 +763,7 @@ function saveReportsLocal(result: CrawlResult): string {
 function writeGitHubSummary(result: CrawlResult): void {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return;
-  appendFileSync(summaryPath, buildMarkdownReport(result) + "\n", "utf-8");
+  appendFileSync(summaryPath, `${buildMarkdownReport(result)}\n`, "utf-8");
 }
 
 // ── Output formatters ───────────────────────────────────────────────
@@ -792,7 +812,7 @@ function log(config: Config, ...args: unknown[]): void {
 async function main(): Promise<void> {
   const config = parseArgs();
 
-  log(config, c.bold(`uat starting`));
+  log(config, c.bold("uat starting"));
   log(config, `  Target:      ${c.cyan(config.baseUrl)}`);
   log(config, `  Max pages:   ${config.maxPages}`);
   log(config, `  Concurrency: ${config.concurrency}`);

@@ -1,5 +1,8 @@
 # Todo Tasks
 
-There are no active task specs at the moment.
+Active work for the npm package release is tracked here.
 
-When new work starts, add the task spec files in this directory and update [`../index.md`](../index.md) plus [`../../EXECPLAN.md`](../../EXECPLAN.md) if the work spans multiple milestones.
+- [`02-package-cli-and-installers.md`](02-package-cli-and-installers.md): ship the compiled CLI plus explicit hook and workflow installers.
+- [`03-publish-first-release.md`](03-publish-first-release.md): validate the tarball, publish `@nothumanwork/uat`, and verify the registry artifact.
+
+Update this index, [`../index.md`](../index.md), and [`../../EXECPLAN.md`](../../EXECPLAN.md) whenever task status changes.

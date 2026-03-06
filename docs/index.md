@@ -16,8 +16,9 @@ This repository documents `uat`, short for UI Automated Testing, using a docs-fi
 
 ## Current State
 
-- No active task specs are open in `docs/tasks/todo/`.
-- All completed stabilization work from the recent `uat` review now lives under `docs/tasks/done/`.
+- Milestone 1 of the npm release plan is complete and archived in `docs/tasks/done/07-establish-release-baseline.md`.
+- Active release work is tracked in `docs/EXECPLAN.md` and `docs/tasks/todo/`.
+- The completed stabilization backlog remains archived under `docs/tasks/done/`.
 
 ## Verification Baseline
 

@@ -1,4 +1,4 @@
-# Stabilize uat
+# Publish `@nothumanwork/uat`
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
@@ -6,82 +6,64 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 ## Purpose / Big Picture
 
-After this backlog is completed, the repository's automated testing workflow will become trustworthy in the places that matter most: the installed pre-commit hook will invoke the checker from the right location, `--no-external` will not fail builds because of external `srcset` assets, invalid numeric CLI input will fail fast instead of hanging, the crawler will discover valid unquoted links that it currently misses, browser checks will stop flagging intentionally hidden controls as broken UI, and internal asset checks will avoid unnecessary full downloads of large non-HTML files.
+After this plan is complete, this repository will ship a public npm package named `@nothumanwork/uat` that can do three concrete things from a downstream project without copying this repo: run the site checker from a CLI, install a managed pre-commit hook into the current Git repository, and install GitHub Actions workflow files into `.github/workflows/` without silently overwriting user-owned files.
 
-The quickest way to observe the desired end state is to run the local reproductions recorded in the task files under `tasks/done/`. Every reproduction in this plan currently demonstrates a real bug or cost center. The work is done when those same commands either fail fast with a helpful validation message or return the expected clean report without regressions.
+The user-visible proof is a full release flow. From a clean checkout, `npm run lint`, `npm run build`, and the relevant smoke tests must pass locally. `npm pack` must produce a tarball containing the compiled CLI and installer templates. `npm publish --access public` must succeed with the scoped package name, and a registry-backed smoke run such as `npx @nothumanwork/uat@1.0.0 --help` or `npx @nothumanwork/uat@1.0.0 check --help` must work.
 
 ## Progress
 
-- [x] (2026-03-06 12:29Z) Reviewed every tracked file in the repository, including hidden files, GitHub workflows, lockfiles, and committed sample reports.
-- [x] (2026-03-06 12:29Z) Validated the hook path bug, the `--no-external` `srcset` bug, the zero-concurrency deadlock, the unquoted-attribute crawl gap, and the dead-element false-positive behavior with direct command evidence.
-- [x] (2026-03-06 12:29Z) Prioritized the backlog and created one task spec per finding, now archived under `tasks/done/`.
-- [x] (2026-03-06 12:44Z) Task 01 completed: the installed pre-commit hook now resolves the repository root with `git rev-parse --show-toplevel` and successfully runs `main.ts` from `.git/hooks/pre-commit`.
-- [x] (2026-03-06 12:44Z) Tasks 02, 03, 04, and 06 completed together in `main.ts`: `srcset` now honors `--no-external`, numeric flags fail fast, unquoted URLs are discovered, and internal non-page assets are checked with `HEAD` first.
-- [x] (2026-03-06 13:01Z) Task 05 completed: hidden-button browser repros are now clean, and a real-site run against `https://littleemperors.com` returned zero browser issues.
-- [x] (2026-03-06 12:44Z) [Fix the installed hook path resolution](tasks/done/01-fix-installed-hook-root-resolution.md)
-- [x] (2026-03-06 12:44Z) [Honor `--no-external` for `srcset` candidates](tasks/done/02-honor-no-external-for-srcset.md)
-- [x] (2026-03-06 12:44Z) [Validate numeric CLI flags before crawling](tasks/done/03-validate-cli-numeric-flags.md)
-- [x] (2026-03-06 12:44Z) [Improve HTML link extraction coverage](tasks/done/04-improve-html-link-extraction.md)
-- [x] (2026-03-06 13:01Z) [Reduce browser dead-element false positives](tasks/done/05-tune-browser-dead-element-detection.md)
-- [x] (2026-03-06 12:44Z) [Avoid full downloads for non-HTML internal assets](tasks/done/06-reduce-non-html-download-cost.md)
+- [x] (2026-03-06 13:52Z) Replaced the completed stabilization backlog with a release-focused ExecPlan and created active task specs in `docs/tasks/todo/`.
+- [x] (2026-03-06 14:01Z) [Establish the release baseline](tasks/done/07-establish-release-baseline.md): package metadata now targets `@nothumanwork/uat`, TypeScript build configuration exists, `npm run lint` passes, and `npm run smoke:help` prints the source CLI help.
+- [ ] Implement the publishable CLI surface so `uat` supports runtime checks plus explicit `init hooks`, `init github`, and `init all` installers.
+- [ ] Validate the packaged artifact with `npm run lint`, `npm run build`, smoke commands, and `npm pack`.
+- [ ] Publish `@nothumanwork/uat@1.0.0` to npm with public access and capture registry-backed verification evidence.
+- [ ] Update the repository docs, AGENTS guidance, and task archive to match the shipped package behavior.
+- [ ] Commit and push each completed milestone with `jj` after its validation passes.
 
 ## Surprises & Discoveries
 
-- Observation: the installed pre-commit hook resolves `SCRIPT_DIR` relative to `.git/hooks/pre-commit`, so it invokes `bun /path/to/repo/.git/main.ts` instead of the repository entrypoint.
-  Evidence: `hooks/pre-commit` computes `SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"`, `setup-hooks.sh` copies that file into `.git/hooks/pre-commit`, and the reproduction command emitted `error: Module not found "/Users/mish/scripts/uat/.git/main.ts"`.
+- Observation: the repository is not publishable to npm in its current form because the package has no `bin` entry, no build output, and the source CLI is explicitly Bun-only.
+  Evidence: `package.json` previously exposed only repository-local scripts, and `main.ts` starts with `#!/usr/bin/env bun` and help text that says `Usage: bun main.ts [options]`.
 
-- Observation: `--no-external` is not applied to `srcset` candidates.
-  Evidence: `main.ts` adds every parsed `srcset` URL to `toCheck` without an origin check, and `bun main.ts --base-url http://127.0.0.1:62445 --no-external --max-pages 1 --output json` still checked `http://127.0.0.1:65531/missing.png` and reported it broken.
+- Observation: the current hook and workflow assets are repository-internal, not downstream-installable.
+  Evidence: `setup-hooks.sh` copies `hooks/pre-commit` into `.git/hooks`, and both workflow files run `bun main.ts` from a checkout of this repository instead of invoking an installed package.
 
-- Observation: zero concurrency deadlocks the crawler instead of returning a validation error.
-  Evidence: `parseArgs()` accepts `--concurrency 0` unchanged, `Semaphore.acquire()` never resolves when `max === 0`, and a three-second subprocess timeout was required for `bun main.ts --base-url https://example.com --no-external --max-pages 1 --concurrency 0 --output json`.
-
-- Observation: valid unquoted `href` and `src` attributes are invisible to the crawler.
-  Evidence: `extractUrls()` only matches quoted `href=` and `src=` attributes, and the local fixture at `http://127.0.0.1:62390/` contains `<a href=/page2>Page 2</a>` but the checker reported only one checked URL and one crawled page.
-
-- Observation: the browser dead-element heuristic treats any zero-sized interactive element as broken, even when it is intentionally hidden.
-  Evidence: `browser.ts` checks only `getBoundingClientRect()` width and height, the local fixture with `<button style="display:none">Hidden</button>` produced a `dead-element` issue, and the committed report `reports/2026-03-06_11-54-35-report.txt` shows the same selector reported across multiple real pages.
-
-- Observation: internal asset verification always downloads full response bodies for non-HTML resources.
-  Evidence: `crawl()` uses `GET` for every internal linked resource, and `fetchWithTimeout()` drains the entire `arrayBuffer()` for any non-HTML `GET` response. That guarantees avoidable bandwidth and latency on PDFs, videos, and other large assets.
+- Observation: the package name `@nothumanwork/uat` is not present on the public npm registry as of 2026-03-06.
+  Evidence: `npm view @nothumanwork/uat version` returned `E404 Not Found`.
 
 ## Decision Log
 
-- Decision: rank workflow-breaking and contract-breaking bugs ahead of coverage and performance work.
-  Rationale: a broken hook and a flag that ignores its documented contract can block developer use and CI immediately, while the later items primarily affect result quality and run cost.
+- Decision: keep the first published version at `1.0.0`.
+  Rationale: the repository already advertises `1.0.0`, the package has never been published under this scope, and there is no registry conflict to force a version bump before the first release.
   Date/Author: 2026-03-06 / Codex
 
-- Decision: keep the backlog split into one task file per finding.
-  Rationale: the user asked for a durable task-doc layout that survives long-running work beyond a context window, so each task file needs to be independently executable as the source of truth for one change.
+- Decision: expose installers as explicit CLI subcommands rather than implicit side effects of `uat` itself.
+  Rationale: running the checker should stay read-only by default, while writing `.git/hooks/pre-commit` or `.github/workflows/*.yml` must be an intentional user action with clear overwrite rules.
   Date/Author: 2026-03-06 / Codex
 
-- Decision: treat `main.ts`, `browser.ts`, `hooks/pre-commit`, and `setup-hooks.sh` as the critical path for the initial repair sequence.
-  Rationale: those files control local dev, CI/CD behavior, crawler correctness, and browser-signal quality.
+- Decision: standardize release work on npm-driven quality gates even if some source-oriented scripts continue to use the existing TypeScript entrypoints during the transition.
+  Rationale: npm is the package publication path, and the published artifact must be validated in the same toolchain used to build and ship it.
   Date/Author: 2026-03-06 / Codex
 
 ## Outcomes & Retrospective
 
-All six backlog items are now implemented and verified with command evidence. The local automation path works from the installed Git hook, the main crawler honors its documented flags and discovers the missed URLs, non-HTML assets are checked more cheaply, and browser mode no longer reports intentionally hidden controls as dead elements.
-
-The repository remains small and understandable, and the task specs plus progress log now preserve continuity from the initial review through the completed fixes. The main residual gap is the absence of a formal automated test suite; verification is still command-driven.
+This plan replaces the earlier stabilization backlog, which is already archived under `docs/tasks/done/`. The repository enters this phase with the crawler fixes already merged and verified, but without npm-ready packaging. The first milestone is now complete: the repo has an active release plan, an archived baseline task record, scoped package metadata, and npm-based lint plus source-smoke commands. The remaining work is implementation-heavy: shipping the installable CLI surface, validating the tarball contents, and publishing the first scoped npm release.
 
 ## Context and Orientation
 
-The repository is a Bun-based TypeScript CLI for crawling a site and optionally running Playwright browser checks. `main.ts` is the command entrypoint and owns CLI parsing, HTML extraction, HTTP fetching, result aggregation, report generation, and the local-vs-CI output split. `browser.ts` is the browser-only pass that inspects crawled pages for console errors, network failures surfaced through Playwright responses, broken images, and zero-sized interactive elements.
+`main.ts` is still the central CLI implementation. It owns argument parsing, the crawl loop, result formatting, report persistence, and the optional Playwright browser pass loaded from `browser.ts`. `setup-hooks.sh` and `hooks/pre-commit` implement the current repository-local hook flow. `.github/workflows/uat-link-check.yml` and `.github/workflows/post-deploy-link-check.yml` are the current repository-local CI examples. `README.md` is the main product document. `package.json`, `package-lock.json`, and `bun.lock` describe the dependency and script surface.
 
-Local workflow integration lives in `setup-hooks.sh` and `hooks/pre-commit`. The installer copies the hook into `.git/hooks`, and the hook tries to call `main.ts` against a local dev server. Remote workflow integration lives in `.github/workflows/uat-link-check.yml` and `.github/workflows/post-deploy-link-check.yml`, both of which run `bun main.ts` in CI. `README.md` documents the intended developer contract. `package.json`, `bun.lock`, and `package-lock.json` define the dependency surface. The `reports/` files are committed run artifacts that show how the current output looks in practice.
+The docs-first project state lives under `docs/`. This file is the canonical execution log. Active task specs live under `docs/tasks/todo/`, completed task specs under `docs/tasks/done/`, and `docs/tasks/index.md` plus `docs/index.md` must be updated whenever the task layout changes. `AGENTS.md` is repo-wide guidance and must capture high-value release learnings as they are confirmed.
 
-The project currently has no formal test suite. Verification therefore relies on command-driven repro fixtures plus the CLI itself. Every task file below includes the exact commands that should become the regression tests or, at minimum, the manual acceptance checks.
+The key architectural shift in this plan is from a repository tool to a package artifact. A package artifact is the tarball published to npm and later installed by `npm install`, `npm exec`, or `npx`. To make that work, the package needs a compiled executable in `dist/`, a `bin` mapping in `package.json`, installer templates that are shipped in the tarball, and commands that behave safely when run in someone else's repository.
 
 ## Plan of Work
 
-Start with the local automation breakage. Update `hooks/pre-commit` so an installed hook can find the repository root after `setup-hooks.sh` copies it into `.git/hooks`. Keep the source hook in the repository, but make it compute the project root in a way that still works from the installed location. Once that is fixed, re-run the existing installation flow and make sure the hook executes `main.ts` instead of failing with a missing module path.
+Milestone 1 establishes release scaffolding. Keep `main.ts` and `browser.ts` as the source of truth, but change the package metadata so the repository can build a `dist/` artifact later. Add TypeScript build configuration and a linter command, then update the plan/task docs so future sessions know the target command structure and validation path.
 
-Next, fix the documented crawl contract in `main.ts`. The first pass is to make `extractUrls()` treat `srcset` candidates the same way it treats `href` and `src`: respect `checkExternal`, preserve `foundOn`, and avoid creating false failures when `--no-external` is set. In the same file, reject non-positive or non-numeric values for `--concurrency`, `--max-pages`, and `--timeout` before constructing the semaphore or starting network work.
+Milestone 2 turns the source CLI into a publishable product. Extend `main.ts` so the default command still runs checks, while `init hooks`, `init github`, and `init all` generate downstream assets from shipped templates. Add the templates themselves, make overwrite behavior explicit and safe, and update README plus repository-local hook/workflow examples to reflect the npm package story.
 
-After the contract fixes, broaden extraction accuracy. `extractUrls()` should stop relying on the current narrow regex behavior for valid markup such as unquoted attributes. The safest implementation is to use a real HTML parser or a deliberately broader extraction routine that still normalizes URLs through `resolveUrl()`.
-
-Finish by improving result quality and cost. In `browser.ts`, dead-element detection should exclude intentionally hidden or non-actionable elements so CI only fails on signals a user can act on. In `main.ts`, internal linked assets should be checked without downloading full non-HTML payloads unless that is required for correctness.
+Milestone 3 validates and publishes. Run the lint/build/smoke gates, inspect the `npm pack` tarball, publish publicly with the provided `NODE_AUTH_TOKEN`, and verify the registry artifact by invoking the published package. Once the release is confirmed, archive the completed task specs, update `docs/EXECPLAN.md`, `docs/tasks/index.md`, `docs/index.md`, and `AGENTS.md`, then commit and push the final documentation state with `jj`.
 
 ## Concrete Steps
 
@@ -89,116 +71,101 @@ Work from the repository root:
 
     cd /Users/mish/scripts/uat
 
-Use the existing commands as smoke checks before and after each task:
+Milestone 1 baseline:
 
-    bun main.ts --help
-    bun main.ts --base-url https://example.com --no-external --max-pages 1 --output json
+    npm install
+    npm run lint
+    npm run smoke:help
 
-Use the per-task reproductions in `tasks/done/` to confirm each bug before editing and to validate the fix afterward. The highest-priority reproductions already captured during review were:
+Expected result: the linter exits 0 and `tsx main.ts --help` prints the current source CLI help.
 
-    ./setup-hooks.sh install
-    LINK_CHECK_PORT=62390 .git/hooks/pre-commit
+Milestone 2 package implementation:
 
-    bun main.ts --base-url http://127.0.0.1:62445 --no-external --max-pages 1 --output json
+    npm run build
+    node dist/main.js --help
+    node dist/main.js check --base-url https://example.com --no-external --max-pages 1 --output json
+    node dist/main.js init hooks --dry-run
+    node dist/main.js init github --dry-run
 
-    bun main.ts --base-url http://127.0.0.1:62390 --no-external --max-pages 5 --output json
+Expected result: the build exits 0, the compiled CLI help references `uat`, the `check` command runs from `dist/`, and both installer commands describe the files they would write without mutating the repository during dry runs.
 
-    bun main.ts --base-url http://127.0.0.1:62390 --no-external --max-pages 1 --browser --output json
+Milestone 3 packaging and release:
 
-For the zero-concurrency hang, keep a timeout wrapper around the CLI until validation is added so the shell does not wedge a session.
+    npm pack
+    npm publish --access public
+    npx @nothumanwork/uat@1.0.0 --help
+
+Expected result: `npm pack` writes a tarball containing `dist/`, `README.md`, and template assets; `npm publish` succeeds with the scoped name; the `npx` smoke run resolves from the registry and prints the packaged CLI help.
+
+At the end of each milestone, update this file plus the affected task specs, run the quality gates for that milestone, then commit and push with `jj describe`, `jj bookmark set main`, and `jj git push --bookmark main`.
 
 ## Validation and Acceptance
 
-The backlog is complete when all six task files can be checked off and the following behavior is true:
+Acceptance requires all of the following:
 
-The installed hook runs from `.git/hooks/pre-commit` and successfully invokes the repository's `main.ts` when a local server is reachable.
+`npm run lint` passes on the checked-in source tree.
 
-`--no-external` never checks cross-origin resources, including URLs discovered only through `srcset`.
+`npm run build` produces a runnable `dist/main.js` CLI artifact.
 
-Invalid numeric flags fail fast with a non-zero exit code and a clear error message instead of hanging or silently accepting nonsense input.
+The compiled CLI supports both the existing crawl behavior and the new installer subcommands. A dry run of each installer shows the exact target files and refuses to overwrite pre-existing files unless an explicit force flag is provided.
 
-The crawler discovers valid links from common HTML forms used by real sites, including unquoted attributes that browsers accept.
+`npm pack` includes only the files needed for downstream use: compiled runtime code, packaged templates, and top-level documentation needed by consumers.
 
-Browser checks surface actionable issues while intentionally hidden controls no longer spam reports or fail CI.
+`npm publish --access public` succeeds using the provided environment token, and a post-publish registry invocation confirms the package can be executed by downstream consumers.
 
-Runs against sites with large internal non-HTML assets stay correct without downloading whole files when the status can be determined more cheaply.
+`README.md`, `docs/index.md`, `docs/tasks/index.md`, `docs/tasks/todo/index.md`, and `AGENTS.md` all describe the shipped command structure and release validation path accurately.
 
 ## Idempotence and Recovery
 
-Each task should be implemented in a small diff and verified immediately with its paired reproduction. If a hook experiment leaves `.git/hooks/pre-commit` installed, use `./setup-hooks.sh uninstall` before retrying from a clean local workflow state. When using temporary local servers for repros, bind to ephemeral ports and stop the server after validation so later sessions do not inherit stale listeners.
+`npm install`, `npm run lint`, `npm run build`, and `npm pack` are safe to re-run. Installer commands must support `--dry-run` so they can be exercised repeatedly without changing the current repository. If an installer writes files incorrectly during development, remove only the generated files and rerun the command after fixing the template or path logic.
 
-If a task starts to broaden beyond its file scope, stop and record the new dependency in both this plan and the task file before editing. Do not silently merge multiple backlog items into one patch; the task files are meant to preserve continuity across interrupted sessions.
+If `npm publish` fails before a version is published, fix the cause and retry the same version. If the publish succeeds but a later smoke check fails, the recovery path is a patch release with the next semver version; do not attempt to overwrite a published version. If the registry token is missing or lacks permission, stop at the publish step, record the exact command and error in this file, and do not mark the release task complete.
+
+Use `jj` for version control checkpoints. Because the working copy is always a commit, set the commit description before each push, then advance the `main` bookmark explicitly. If a milestone needs to be rolled back locally, use `jj undo` or `jj op restore <op-id>` rather than destructive Git commands.
 
 ## Artifacts and Notes
 
-Verified installed hook success:
+Pre-release registry availability check:
 
-    [uat] Checking local site on port 63923 (max 50 pages)...
-    uat starting
-      Target:      http://localhost:63923
-    ...
-    No broken links found.
-    [uat] All checks OK.
+    $ npm view @nothumanwork/uat version
+    npm error code E404
+    npm error 404 Not Found - GET https://registry.npmjs.org/@nothumanwork%2fuat - Not found
 
-Verified `--no-external` fix:
+Toolchain versions used while drafting this plan:
 
-    {
-      "baseUrl": "http://127.0.0.1:63923",
-      "pagesChecked": 2,
-      "linksChecked": 3,
-      "brokenLinks": []
-    }
+    $ node --version
+    v25.2.1
 
-Verified unquoted-link crawl:
+    $ npm --version
+    11.6.2
 
-    {
-      "baseUrl": "http://127.0.0.1:63923",
-      "pagesChecked": 2,
-      "linksChecked": 3
-    }
+    $ bun --version
+    1.3.11
 
-Verified numeric validation:
+Milestone 1 validation:
 
-    Error: --concurrency must be a positive integer. Received "0".
-    exit:1
+    $ npm install
+    added 8 packages, changed 3 packages, and audited 13 packages in 7s
+    found 0 vulnerabilities
 
-Verified dead-element false-positive removal:
+    $ npm run lint
+    > @nothumanwork/uat@1.0.0 lint
+    > biome check main.ts browser.ts package.json tsconfig.json biome.json
+    Checked 5 files in 10ms. No fixes applied.
 
-    {
-      "baseUrl": "http://127.0.0.1:64196",
-      "browserIssues": [],
-      "browserPagesChecked": 1
-    }
-
-Verified real-site browser cleanup:
-
-    {
-      "baseUrl": "https://littleemperors.com",
-      "pagesChecked": 10,
-      "linksChecked": 209,
-      "brokenLinks": [],
-      "browserIssues": [],
-      "browserPagesChecked": 10
-    }
-
-Verified lower-cost asset probing:
-
-    GET /
-    GET /page2
-    HEAD /asset.pdf
+    $ npm run smoke:help
+    > @nothumanwork/uat@1.0.0 smoke:help
+    > tsx main.ts --help
+    Usage: bun main.ts [options]
 
 ## Interfaces and Dependencies
 
-The relevant public surface is the Bun CLI in `main.ts`. The following interfaces and functions are the primary change points:
+The published package will expose one executable named `uat` through the `bin` map in `package.json`. The default behavior must remain the site checker currently implemented in `main.ts`, and the checker must preserve the existing flag contract for `--base-url`, `--max-pages`, `--concurrency`, `--timeout`, `--no-external`, `--verbose`, `--output`, `--entry-points`, `--exit-on-failure`, and `--browser`.
 
-`Config` in `main.ts` remains the parsed CLI contract and should gain stronger validation semantics without changing the documented flag names.
+`browser.ts` remains the Playwright-backed browser engine. `playwright` stays a runtime dependency because browser mode needs Chromium automation at execution time.
 
-`extractUrls()` in `main.ts` owns URL discovery and must continue returning `{ toCrawl, toCheck }`, but it needs to apply origin filtering consistently and broaden supported HTML attribute forms.
+The new installer surface must live in the published CLI. It needs explicit commands that write a pre-commit hook to `.git/hooks/pre-commit` and workflow files into `.github/workflows/`. The installers must ship their source assets inside the npm tarball, and they must implement no-overwrite-by-default semantics with an explicit force escape hatch.
 
-`fetchWithTimeout()` and the linked-resource branch inside `crawl()` determine how URLs are probed. Any optimization here must preserve accurate broken-link reporting and keep `foundOn` provenance intact.
+The release quality gates for this plan are `npm run lint`, `npm run build`, source or compiled smoke commands, `npm pack`, and `npm publish --access public`.
 
-`BrowserIssue`, `checkPage()`, and `runBrowserChecks()` in `browser.ts` define browser-mode behavior. Heuristic changes should keep the existing issue type schema stable unless a task file explicitly expands it.
-
-`hooks/pre-commit` and `setup-hooks.sh` are the local developer automation interface. Any change there must preserve `install`, `uninstall`, and `status` behavior while making installed hooks self-locating.
-
-Change note: updated on 2026-03-06 after completing all six tasks and re-running the local hook, crawler, and browser verification flows.
+Change note: replaced the completed stabilization ExecPlan with a release ExecPlan for publishing `@nothumanwork/uat`, then updated milestone 1 with npm-based lint/smoke evidence and archived the completed baseline task.

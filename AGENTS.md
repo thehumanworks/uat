@@ -9,6 +9,7 @@ This repository uses a docs-first workflow layout.
 
 When you move or add docs, update `docs/index.md` and `docs/tasks/index.md` in the same change.
 
-For code changes, verify with the smallest relevant command-driven checks first. The current baseline smoke command is:
+For code changes, verify with the smallest relevant command-driven checks first. During the current npm packaging work, keep `docs/EXECPLAN.md` and `docs/tasks/todo/` in sync with each milestone. The release baseline quality gates are:
 
-    bun main.ts --help
+    npm run lint
+    npm run smoke:help

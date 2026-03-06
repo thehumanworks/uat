@@ -1,16 +1,33 @@
 {
-  "name": "uat",
+  "name": "@nothumanwork/uat",
   "version": "1.0.0",
   "description": "UI Automated Testing (uat) for websites",
+  "type": "module",
+  "bin": {
+    "uat": "./dist/main.js"
+  },
+  "files": ["dist", "templates", "README.md"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "check": "bun main.ts --base-url ${BASE_URL:?Set BASE_URL}",
-    "check:local": "bun main.ts --base-url http://localhost:${PORT:-3000} --no-external",
-    "check:browser": "bun main.ts --base-url ${BASE_URL:?Set BASE_URL} --browser",
-    "check:verbose": "bun main.ts --base-url ${BASE_URL:?Set BASE_URL} --verbose",
-    "check:json": "bun main.ts --base-url ${BASE_URL:?Set BASE_URL} --output json"
+    "build": "tsc -p tsconfig.json",
+    "check": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL}",
+    "check:browser": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL} --browser",
+    "check:json": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL} --output json",
+    "check:local": "tsx main.ts --base-url http://localhost:${PORT:-3000} --no-external",
+    "check:verbose": "tsx main.ts --base-url ${BASE_URL:?Set BASE_URL} --verbose",
+    "lint": "biome check main.ts browser.ts package.json tsconfig.json biome.json",
+    "smoke:help": "tsx main.ts --help"
   },
   "devDependencies": {
-    "@types/node": "^25.3.5"
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^25.3.5",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2"
   },
   "dependencies": {
     "playwright": "^1.58.2"

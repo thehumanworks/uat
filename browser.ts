@@ -92,30 +92,34 @@ async function checkPage(
     documentUrl = response?.url() ?? url;
 
     // c. Broken images
-    const brokenImages = await page.evaluate((): { src: string; alt: string }[] => {
-      const imgs = Array.from(document.querySelectorAll("img"));
-      const broken: { src: string; alt: string }[] = [];
-      for (const img of imgs) {
-        const src = img.getAttribute("src") ?? "";
-        // Skip empty src and tiny SVG placeholders
-        if (!src || src.startsWith("data:")) continue;
-        const isSvgTiny =
-          src.toLowerCase().endsWith(".svg") &&
-          img.naturalWidth < 10 &&
-          img.naturalHeight < 10;
-        if (isSvgTiny) continue;
-        if (img.naturalWidth === 0 && img.naturalHeight === 0) {
-          broken.push({
-            src,
-            alt: img.getAttribute("alt") ?? "",
-          });
+    const brokenImages = await page.evaluate(
+      (): { src: string; alt: string }[] => {
+        const imgs = Array.from(document.querySelectorAll("img"));
+        const broken: { src: string; alt: string }[] = [];
+        for (const img of imgs) {
+          const src = img.getAttribute("src") ?? "";
+          // Skip empty src and tiny SVG placeholders
+          if (!src || src.startsWith("data:")) continue;
+          const isSvgTiny =
+            src.toLowerCase().endsWith(".svg") &&
+            img.naturalWidth < 10 &&
+            img.naturalHeight < 10;
+          if (isSvgTiny) continue;
+          if (img.naturalWidth === 0 && img.naturalHeight === 0) {
+            broken.push({
+              src,
+              alt: img.getAttribute("alt") ?? "",
+            });
+          }
         }
-      }
-      return broken;
-    });
+        return broken;
+      },
+    );
 
     for (const img of brokenImages) {
-      const selector = img.alt ? `img[alt="${img.alt}"]` : `img[src="${img.src}"]`;
+      const selector = img.alt
+        ? `img[alt="${img.alt}"]`
+        : `img[src="${img.src}"]`;
       issues.push({
         type: "broken-image",
         pageUrl: url,
@@ -125,47 +129,52 @@ async function checkPage(
     }
 
     // d. Dead elements — visible in DOM but zero-sized / invisible
-    const deadElements = await page.evaluate((): { selector: string; tag: string }[] => {
-      const candidates = Array.from(
-        document.querySelectorAll('a[href], button, [role="button"], [onclick]'),
-      ).slice(0, 50);
+    const deadElements = await page.evaluate(
+      (): { selector: string; tag: string }[] => {
+        const candidates = Array.from(
+          document.querySelectorAll(
+            'a[href], button, [role="button"], [onclick]',
+          ),
+        ).slice(0, 50);
 
-      const dead: { selector: string; tag: string }[] = [];
-      for (const el of candidates) {
-        const element = el as HTMLElement;
-        const style = window.getComputedStyle(element);
-        const hiddenByAttributes =
-          element.hidden ||
-          element.getAttribute("aria-hidden") === "true" ||
-          element.closest("[hidden], [aria-hidden='true']") !== null;
-        const hiddenByStyle =
-          style.display === "none" ||
-          style.display === "contents" ||
-          style.visibility === "hidden" ||
-          style.visibility === "collapse" ||
-          style.pointerEvents === "none";
-        const hiddenByLayout =
-          element.getClientRects().length === 0 &&
-          element.offsetParent === null &&
-          style.position !== "fixed";
+        const dead: { selector: string; tag: string }[] = [];
+        for (const el of candidates) {
+          const element = el as HTMLElement;
+          const style = window.getComputedStyle(element);
+          const hiddenByAttributes =
+            element.hidden ||
+            element.getAttribute("aria-hidden") === "true" ||
+            element.closest("[hidden], [aria-hidden='true']") !== null;
+          const hiddenByStyle =
+            style.display === "none" ||
+            style.display === "contents" ||
+            style.visibility === "hidden" ||
+            style.visibility === "collapse" ||
+            style.pointerEvents === "none";
+          const hiddenByLayout =
+            element.getClientRects().length === 0 &&
+            element.offsetParent === null &&
+            style.position !== "fixed";
 
-        if (hiddenByAttributes || hiddenByStyle || hiddenByLayout) {
-          continue;
+          if (hiddenByAttributes || hiddenByStyle || hiddenByLayout) {
+            continue;
+          }
+
+          const rect = element.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) {
+            const tag = element.tagName.toLowerCase();
+            const id = element.id ? `#${element.id}` : "";
+            const cls =
+              element.className && typeof element.className === "string"
+                ? `.${element.className.trim().split(/\s+/).join(".")}`
+                : "";
+            const text = element.textContent?.trim().slice(0, 30) ?? "";
+            dead.push({ selector: `${tag}${id}${cls}`, tag: text || tag });
+          }
         }
-
-        const rect = element.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) {
-          const tag = element.tagName.toLowerCase();
-          const id = element.id ? `#${element.id}` : "";
-          const cls = element.className && typeof element.className === "string"
-            ? "." + element.className.trim().split(/\s+/).join(".")
-            : "";
-          const text = element.textContent?.trim().slice(0, 30) ?? "";
-          dead.push({ selector: `${tag}${id}${cls}`, tag: text || tag });
-        }
-      }
-      return dead;
-    });
+        return dead;
+      },
+    );
 
     for (const el of deadElements) {
       issues.push({
