@@ -37,13 +37,6 @@ npx @nothumanwork/uat init github
 
 The installer commands refuse to overwrite files with different content unless you pass `--force`. Use `--dry-run` to preview the writes.
 
-## Documentation Layout
-
-- `docs/index.md` is the repository documentation entrypoint.
-- `docs/tasks/todo/` holds active task specs.
-- `docs/tasks/done/` archives completed task specs.
-- `docs/EXECPLAN.md` remains the living execution log for long-running work.
-
 ## Usage
 
 ```bash

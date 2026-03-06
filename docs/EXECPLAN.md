@@ -6,7 +6,7 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 ## Purpose / Big Picture
 
-This repository now ships a public npm package named `@nothumanwork/uat`. The published CLI gives downstream projects one entrypoint for site checks plus explicit installers for the managed pre-commit hook and GitHub Actions workflows.
+This repository now ships a public npm package named `@nothumanwork/uat`. The published CLI gives downstream projects one entrypoint for site checks plus explicit installers for the managed pre-commit hook and GitHub Actions workflows. The latest patch release keeps the npm package page consumer-focused by moving repo-layout notes out of the published README and into `AGENTS.md`.
 
 The release proof for this plan is:
 
@@ -16,9 +16,9 @@ The release proof for this plan is:
     npm run smoke:compiled
     npm pack --json
     npm view @nothumanwork/uat version
-    npx @nothumanwork/uat@1.0.1 --help
+    npx @nothumanwork/uat@1.0.2 --help
 
-Those checks now succeed, and the public registry serves both `1.0.0` and `1.0.1`, with `1.0.1` as `latest`.
+The public registry now serves `1.0.0`, `1.0.1`, and `1.0.2`, with `1.0.2` as `latest`.
 
 ## Progress
 
@@ -28,6 +28,7 @@ Those checks now succeed, and the public registry serves both `1.0.0` and `1.0.1
 - [x] (2026-03-06 14:08Z) Validated the package boundary with `npm pack --json` and a tarball-backed CLI smoke run before publishing.
 - [x] (2026-03-06) The npm registry now serves `@nothumanwork/uat` publicly with versions `1.0.0` and `1.0.1`, and `latest` resolves to `1.0.1`.
 - [x] (2026-03-06) Archived the final release task and updated the docs-first task indexes to show zero active tasks.
+- [x] (2026-03-06) [Refresh the package README and republish](tasks/done/10-refresh-package-readme-and-republish.md): published `1.0.2` with the repo-layout guidance removed from the npm-facing README and preserved in `AGENTS.md`.
 
 ## Surprises & Discoveries
 
@@ -40,6 +41,9 @@ Those checks now succeed, and the public registry serves both `1.0.0` and `1.0.1
 - Observation: npm publish verification needs both authenticated metadata checks and a separate anonymous `npx` read-path check.
   Evidence: the release guidance now requires `npm access get status`, `npm dist-tag ls`, and a clean-temp-directory `npx @nothumanwork/uat@<version> --help`, because metadata and public reads do not always become available at the same time.
 
+- Observation: the root `README.md` is the npm package page, so repo-layout notes placed there leak onto the published package page.
+  Evidence: the package includes `README.md` in `package.json`, and the repo-level layout section in the root README was visible to npm consumers until moved out.
+
 ## Decision Log
 
 - Decision: expose installers as explicit CLI subcommands rather than implicit side effects of `uat` itself.
@@ -50,13 +54,17 @@ Those checks now succeed, and the public registry serves both `1.0.0` and `1.0.1
   Rationale: npm is the package publication path, and the published artifact must be validated in the same toolchain used to build and ship it.
   Date/Author: 2026-03-06 / Codex
 
-- Decision: keep the repository package version aligned with the current public `latest` tag at `1.0.1`.
-  Rationale: registry verification now shows `latest: 1.0.1`, and no additional publish is required to satisfy the release plan.
+- Decision: keep the repository package version aligned with the current public `latest` tag.
+  Rationale: release docs and package metadata should match the version that downstream users resolve from npm.
+  Date/Author: 2026-03-06 / Codex
+
+- Decision: ship the README cleanup as patch release `1.0.2`.
+  Rationale: the package code is unchanged, but the published npm page changed materially and deserves a traceable new release.
   Date/Author: 2026-03-06 / Codex
 
 ## Outcomes & Retrospective
 
-The npm packaging and release work is complete. The repository now builds a publishable Node CLI, ships the downstream installer templates inside `templates/`, documents the npm-first workflow, and has no active tasks under `docs/tasks/todo/`. The public registry serves the package successfully, including anonymous `npx` execution.
+The npm packaging and release work is complete. The repository builds a publishable Node CLI, ships the downstream installer templates inside `templates/`, documents the npm-first workflow, and now publishes a package page that stays consumer-focused. There are no active tasks under `docs/tasks/todo/`.
 
 ## Context and Orientation
 
@@ -64,7 +72,7 @@ The npm packaging and release work is complete. The repository now builds a publ
 
 Repository-local automation lives in `setup-hooks.sh`, `hooks/pre-commit`, and `.github/workflows/`. Downstream package assets live in `templates/pre-commit`, `templates/uat-link-check.yml`, and `templates/uat-post-deploy-link-check.yml`.
 
-The docs-first project state lives under `docs/`. This file remains the canonical execution log, and future work should start by creating a new task spec under `docs/tasks/todo/` and updating the task indexes in the same change.
+The docs-first project state lives under `docs/`. This file remains the canonical execution log, and completed release tasks are archived under `docs/tasks/done/`.
 
 ## Plan of Work
 
@@ -80,9 +88,9 @@ Release closeout now meets all acceptance criteria:
 
 `npm run smoke:help` and `npm run smoke:compiled` both print the expected command surface.
 
-`npm pack --json` produces the publishable tarball containing `dist/`, `templates/`, and `README.md`.
+`npm pack --json` produces the publishable tarball containing `dist/`, `templates/`, and the package-facing `README.md`.
 
-The npm registry reports `@nothumanwork/uat` as public with `latest: 1.0.1`, and anonymous `npx` execution works for the published package.
+The npm registry reports `@nothumanwork/uat` as public with `latest: 1.0.2`, and anonymous `npx @nothumanwork/uat@1.0.2 --help` works for the published package.
 
 ## Idempotence and Recovery
 
@@ -94,21 +102,21 @@ If a future public read path lags after publish, keep the task open instead of r
 
 ## Artifacts and Notes
 
-Registry state verified during closeout:
+Registry state after the patch release:
 
     $ npm view @nothumanwork/uat version
-    1.0.1
+    1.0.2
 
     $ npm view @nothumanwork/uat versions --json
-    ["1.0.0", "1.0.1"]
+    ["1.0.0", "1.0.1", "1.0.2"]
 
     $ npm access get status @nothumanwork/uat
     @nothumanwork/uat: public
 
     $ npm dist-tag ls @nothumanwork/uat
-    latest: 1.0.1
+    latest: 1.0.2
 
-    $ npx @nothumanwork/uat@1.0.1 --help
+    $ npx @nothumanwork/uat@1.0.2 --help
     Usage:
       uat check [options]
       uat init hooks [--dry-run] [--force] [--cwd <path>]

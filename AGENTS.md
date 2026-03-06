@@ -2,6 +2,7 @@
 
 This repository uses a docs-first workflow layout.
 
+- Keep `README.md` package-consumer-focused. npm renders the root README on the package page, so repo-level workflow notes and AI-agent instructions belong in this file instead of the npm-facing README.
 - Start at `docs/index.md` for the documentation map.
 - Active task specs live under `docs/tasks/todo/`.
 - Completed task specs live under `docs/tasks/done/`.

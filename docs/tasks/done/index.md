@@ -11,3 +11,4 @@ All task specs in this directory represent completed work and remain here as the
 - [`07-establish-release-baseline.md`](07-establish-release-baseline.md)
 - [`08-package-cli-and-installers.md`](08-package-cli-and-installers.md)
 - [`09-publish-first-release.md`](09-publish-first-release.md)
+- [`10-refresh-package-readme-and-republish.md`](10-refresh-package-readme-and-republish.md)

@@ -1,6 +1,6 @@
 {
   "name": "@nothumanwork/uat",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "UI Automated Testing (uat) for websites",
   "type": "module",
   "bin": {

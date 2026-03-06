@@ -8,7 +8,7 @@
 ## Status Summary
 
 - Active tasks: 0
-- Completed tasks: 9
+- Completed tasks: 10
 
 ## Active Tasks
 
@@ -25,3 +25,4 @@ No active tasks. Create a new task spec under [`todo/`](todo/) before starting t
 - [`done/07-establish-release-baseline.md`](done/07-establish-release-baseline.md)
 - [`done/08-package-cli-and-installers.md`](done/08-package-cli-and-installers.md)
 - [`done/09-publish-first-release.md`](done/09-publish-first-release.md)
+- [`done/10-refresh-package-readme-and-republish.md`](done/10-refresh-package-readme-and-republish.md)
