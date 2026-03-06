@@ -7,12 +7,12 @@
 
 ## Status Summary
 
-- Active tasks: 1
-- Completed tasks: 8
+- Active tasks: 0
+- Completed tasks: 9
 
 ## Active Tasks
 
-- [`todo/03-publish-first-release.md`](todo/03-publish-first-release.md)
+No active tasks. Create a new task spec under [`todo/`](todo/) before starting the next workstream.
 
 ## Completed Tasks
 
@@ -24,3 +24,4 @@
 - [`done/06-reduce-non-html-download-cost.md`](done/06-reduce-non-html-download-cost.md)
 - [`done/07-establish-release-baseline.md`](done/07-establish-release-baseline.md)
 - [`done/08-package-cli-and-installers.md`](done/08-package-cli-and-installers.md)
+- [`done/09-publish-first-release.md`](done/09-publish-first-release.md)

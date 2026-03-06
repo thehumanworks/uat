@@ -10,3 +10,4 @@ All task specs in this directory represent completed work and remain here as the
 - [`06-reduce-non-html-download-cost.md`](06-reduce-non-html-download-cost.md)
 - [`07-establish-release-baseline.md`](07-establish-release-baseline.md)
 - [`08-package-cli-and-installers.md`](08-package-cli-and-installers.md)
+- [`09-publish-first-release.md`](09-publish-first-release.md)

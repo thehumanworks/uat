@@ -1,10 +1,10 @@
 {
   "name": "@nothumanwork/uat",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "UI Automated Testing (uat) for websites",
   "type": "module",
   "bin": {
-    "uat": "./dist/main.js"
+    "uat": "dist/main.js"
   },
   "files": ["dist", "templates", "README.md"],
   "publishConfig": {

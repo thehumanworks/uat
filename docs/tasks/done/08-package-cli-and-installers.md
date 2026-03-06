@@ -29,7 +29,7 @@ The package would not be useful to downstream projects if it still depended on t
 
 The CLI now exposes a command layer with `check`, `init hooks`, `init github`, and `init all`, while still accepting the historical `uat --base-url ...` form for compatibility. The TypeScript build now emits a runnable `dist/main.js` for Node, and the downstream installer templates are shipped under `templates/`.
 
-Repository-local automation was moved onto the same npm/Node path used for packaging: the source pre-commit hook now runs `tsx main.ts check ...`, and the repository workflows install dependencies, build the package artifact, and execute `node dist/main.js check ...`. The published templates install version-pinned downstream hooks and workflow files that execute `npx --yes @nothumanwork/uat@1.0.0`.
+Repository-local automation was moved onto the same npm/Node path used for packaging: the source pre-commit hook now runs `tsx main.ts check ...`, and the repository workflows install dependencies, build the package artifact, and execute `node dist/main.js check ...`. The published templates install version-pinned downstream hooks and workflow files that execute `npx --yes @nothumanwork/uat@<version>`.
 
 ## Validation
 

@@ -16,8 +16,8 @@ This repository documents `uat`, short for UI Automated Testing, using a docs-fi
 
 ## Current State
 
-- Milestones 1 and 2 of the npm release plan are complete and archived in `docs/tasks/done/`.
-- One active release task remains under `docs/tasks/todo/`: publish and verify `@nothumanwork/uat@1.0.0`.
+- The npm release plan is complete and archived under `docs/tasks/done/`.
+- The public npm package `@nothumanwork/uat` is available with `1.0.1` as the current `latest` tag.
 - The completed stabilization backlog remains archived under `docs/tasks/done/`.
 
 ## Verification Baseline
@@ -27,3 +27,4 @@ Run from the repository root:
     npm run lint
     npm run build
     npm run smoke:help
+    npm run smoke:compiled

@@ -20,3 +20,5 @@ For npm registry auth during release work, use a temporary `NPM_CONFIG_USERCONFI
 For compiled CLI smoke tests during release work, prefer a local HTTP fixture over external HTTPS URLs so validation is not gated on the host machine's Node trust store.
 
 Published-package installer assets live in `templates/`, and `main.ts` replaces the `__PACKAGE_*__` and `__PLAYWRIGHT_SPEC__` tokens at install time. Repo-local CI runs `node dist/main.js check`, while the published installers generate `npx --yes @nothumanwork/uat@<version>` workflows and hooks.
+
+After `npm publish`, verify both `npm access get status @nothumanwork/uat` and `npm dist-tag ls @nothumanwork/uat` with the temporary userconfig. Do not close a release until anonymous `npx @nothumanwork/uat@<version> --help` succeeds from a clean temp directory; public npm reads can lag the authenticated metadata path.

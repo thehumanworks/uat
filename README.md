@@ -127,6 +127,7 @@ Installs both the pre-commit hook and the GitHub workflows in one command.
 | `npm run build` | Compile the publishable CLI into `dist/` | TypeScript |
 | `npm run lint` | Lint source and package metadata | Biome |
 | `npm run smoke:help` | Print the source CLI help via `tsx` | `tsx` |
+| `npm run smoke:compiled` | Print the compiled CLI help via `node dist/main.js` | `dist/` |
 
 ## What it checks
 
