@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Site link checker — crawls from a base URL, follows internal links,
+ * uat (UI Automated Testing) — crawls from a base URL, follows internal links,
  * and reports broken links (404s, 5xx, timeouts).
  *
  * Usage:
@@ -73,6 +73,11 @@ const c = {
 
 // ── CLI arg parsing ─────────────────────────────────────────────────
 
+function exitWithCliError(message: string): never {
+  console.error(`Error: ${message}`);
+  process.exit(1);
+}
+
 function parseArgs(): Config {
   const args = process.argv.slice(2);
   const config: Config = {
@@ -90,19 +95,40 @@ function parseArgs(): Config {
     browser: false,
   };
 
+  const readFlagValue = (index: number, flag: string): string => {
+    const value = args[index + 1];
+    if (value == null || value.startsWith("--")) {
+      exitWithCliError(`${flag} requires a value.`);
+    }
+    return value;
+  };
+
+  const parsePositiveIntegerFlag = (index: number, flag: string): number => {
+    const raw = readFlagValue(index, flag);
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value <= 0) {
+      exitWithCliError(`${flag} must be a positive integer. Received "${raw}".`);
+    }
+    return value;
+  };
+
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case "--base-url":
-        config.baseUrl = args[++i];
+        config.baseUrl = readFlagValue(i, "--base-url");
+        i++;
         break;
       case "--max-pages":
-        config.maxPages = parseInt(args[++i], 10);
+        config.maxPages = parsePositiveIntegerFlag(i, "--max-pages");
+        i++;
         break;
       case "--concurrency":
-        config.concurrency = parseInt(args[++i], 10);
+        config.concurrency = parsePositiveIntegerFlag(i, "--concurrency");
+        i++;
         break;
       case "--timeout":
-        config.timeout = parseInt(args[++i], 10);
+        config.timeout = parsePositiveIntegerFlag(i, "--timeout");
+        i++;
         break;
       case "--no-external":
         config.checkExternal = false;
@@ -111,10 +137,15 @@ function parseArgs(): Config {
         config.verbose = true;
         break;
       case "--output":
-        config.outputFormat = args[++i] as "text" | "json";
+        config.outputFormat = readFlagValue(i, "--output") as "text" | "json";
+        i++;
         break;
       case "--entry-points":
-        config.entryPoints = args[++i].split(",").map((p) => p.trim());
+        config.entryPoints = readFlagValue(i, "--entry-points")
+          .split(",")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        i++;
         break;
       case "--exit-on-failure":
         config.exitOnFailure = true;
@@ -145,8 +176,7 @@ function parseArgs(): Config {
   }
 
   if (!config.baseUrl) {
-    console.error("Error: --base-url is required (or set BASE_URL env var).");
-    process.exit(1);
+    exitWithCliError("--base-url is required (or set BASE_URL env var).");
   }
 
   config.baseUrl = config.baseUrl.replace(/\/+$/, "");
@@ -237,42 +267,49 @@ function extractUrls(
 ): { toCrawl: string[]; toCheck: string[] } {
   const toCrawl = new Set<string>();
   const toCheck = new Set<string>();
+  const pageBase = new URL(pageUrl);
 
-  // href= and src= attributes (covers <a>, <link>, <img>, <script>, <iframe>, <source>, <video>, <audio>)
-  const attrRegex = /(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = attrRegex.exec(html)) !== null) {
-    const raw = match[1] ?? match[2];
-    if (!raw) continue;
-
-    const resolved = resolveUrl(raw, new URL(pageUrl));
-    if (!resolved) continue;
+  const addDiscoveredUrl = (raw: string, allowCrawl: boolean) => {
+    const resolved = resolveUrl(raw, pageBase);
+    if (!resolved) return;
 
     const sameOrigin = isSameOrigin(resolved, baseOrigin);
 
     if (sameOrigin) {
       toCheck.add(resolved);
-      if (isLikelyPage(resolved)) {
+      if (allowCrawl && isLikelyPage(resolved)) {
         toCrawl.add(resolved);
       }
-    } else if (checkExternal) {
+      return;
+    }
+
+    if (checkExternal) {
       toCheck.add(resolved);
     }
+  };
+
+  // href= and src= attributes (covers <a>, <link>, <img>, <script>, <iframe>, <source>, <video>, <audio>)
+  const attrRegex =
+    /(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = attrRegex.exec(html)) !== null) {
+    const raw = match[1] ?? match[2] ?? match[3];
+    if (!raw) continue;
+    addDiscoveredUrl(raw, true);
   }
 
   // Also check srcset (responsive images)
-  const srcsetRegex = /srcset\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+  const srcsetRegex =
+    /srcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
   while ((match = srcsetRegex.exec(html)) !== null) {
-    const srcset = match[1] ?? match[2];
+    const srcset = match[1] ?? match[2] ?? match[3];
     if (!srcset) continue;
     // srcset format: "url 1x, url 2x" or "url 100w, url 200w"
     for (const entry of srcset.split(",")) {
       const url = entry.trim().split(/\s+/)[0];
       if (!url) continue;
-      const resolved = resolveUrl(url, new URL(pageUrl));
-      if (!resolved) continue;
-      toCheck.add(resolved);
+      addDiscoveredUrl(url, false);
     }
   }
 
@@ -285,6 +322,7 @@ async function fetchWithTimeout(
   url: string,
   timeout: number,
   method: "GET" | "HEAD" = "GET",
+  readBody = method === "GET",
 ): Promise<{ status: number; statusText: string; body: string | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -302,7 +340,7 @@ async function fetchWithTimeout(
     });
 
     let body: string | null = null;
-    if (method === "GET") {
+    if (method === "GET" && readBody) {
       const contentType = resp.headers.get("content-type") ?? "";
       if (contentType.includes("text/html")) {
         body = await resp.text();
@@ -310,6 +348,8 @@ async function fetchWithTimeout(
         // Drain the response body
         await resp.arrayBuffer();
       }
+    } else if (method === "GET") {
+      await resp.body?.cancel();
     }
 
     return { status: resp.status, statusText: resp.statusText, body };
@@ -452,21 +492,23 @@ async function crawl(config: Config, quiet = false): Promise<CrawlResult> {
     );
   }
 
-  // Check unchecked URLs (use HEAD for external, GET for internal)
+  // Check unchecked URLs. Only fetch bodies for likely same-origin pages.
   const checkBatch = async (urls: string[]) => {
     const tasks = urls.map(async (url) => {
       await sem.acquire();
       try {
         const isInternal = isSameOrigin(url, baseOrigin);
+        const shouldFetchBody = isInternal && isLikelyPage(url);
         let result = await fetchWithTimeout(
           url,
           config.timeout,
-          isInternal ? "GET" : "HEAD",
+          shouldFetchBody ? "GET" : "HEAD",
+          shouldFetchBody,
         );
 
         // Some servers reject HEAD — retry with GET if we get 405 or 403
-        if (!isInternal && (result.status === 405 || result.status === 403)) {
-          result = await fetchWithTimeout(url, config.timeout, "GET");
+        if (!shouldFetchBody && (result.status === 405 || result.status === 403)) {
+          result = await fetchWithTimeout(url, config.timeout, "GET", false);
         }
 
         const statusKey: number | "timeout" | "error" =
@@ -750,7 +792,7 @@ function log(config: Config, ...args: unknown[]): void {
 async function main(): Promise<void> {
   const config = parseArgs();
 
-  log(config, c.bold(`Link checker starting`));
+  log(config, c.bold(`uat starting`));
   log(config, `  Target:      ${c.cyan(config.baseUrl)}`);
   log(config, `  Max pages:   ${config.maxPages}`);
   log(config, `  Concurrency: ${config.concurrency}`);

@@ -132,14 +132,35 @@ async function checkPage(
 
       const dead: { selector: string; tag: string }[] = [];
       for (const el of candidates) {
-        const rect = el.getBoundingClientRect();
+        const element = el as HTMLElement;
+        const style = window.getComputedStyle(element);
+        const hiddenByAttributes =
+          element.hidden ||
+          element.getAttribute("aria-hidden") === "true" ||
+          element.closest("[hidden], [aria-hidden='true']") !== null;
+        const hiddenByStyle =
+          style.display === "none" ||
+          style.display === "contents" ||
+          style.visibility === "hidden" ||
+          style.visibility === "collapse" ||
+          style.pointerEvents === "none";
+        const hiddenByLayout =
+          element.getClientRects().length === 0 &&
+          element.offsetParent === null &&
+          style.position !== "fixed";
+
+        if (hiddenByAttributes || hiddenByStyle || hiddenByLayout) {
+          continue;
+        }
+
+        const rect = element.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) {
-          const tag = el.tagName.toLowerCase();
-          const id = el.id ? `#${el.id}` : "";
-          const cls = el.className && typeof el.className === "string"
-            ? "." + el.className.trim().split(/\s+/).join(".")
+          const tag = element.tagName.toLowerCase();
+          const id = element.id ? `#${element.id}` : "";
+          const cls = element.className && typeof element.className === "string"
+            ? "." + element.className.trim().split(/\s+/).join(".")
             : "";
-          const text = el.textContent?.trim().slice(0, 30) ?? "";
+          const text = element.textContent?.trim().slice(0, 30) ?? "";
           dead.push({ selector: `${tag}${id}${cls}`, tag: text || tag });
         }
       }

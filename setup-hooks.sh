@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or uninstall the link-checker pre-commit hook.
+# Install or uninstall the uat pre-commit hook.
 #
 # Usage:
 #   ./setup-hooks.sh install   — install the pre-commit hook
@@ -36,7 +36,7 @@ case "${1:-status}" in
   install)
     mkdir -p "$HOOKS_DIR"
 
-    if [ -f "$HOOK_TARGET" ] && ! grep -q "link-checker" "$HOOK_TARGET"; then
+    if [ -f "$HOOK_TARGET" ] && ! grep -q "uat-pre-commit-hook" "$HOOK_TARGET"; then
       echo "Warning: existing pre-commit hook found. Backing up to pre-commit.bak"
       cp "$HOOK_TARGET" "${HOOK_TARGET}.bak"
     fi
@@ -59,7 +59,7 @@ case "${1:-status}" in
     ;;
 
   uninstall)
-    if [ -f "$HOOK_TARGET" ] && grep -q "link-checker" "$HOOK_TARGET"; then
+    if [ -f "$HOOK_TARGET" ] && grep -q "uat-pre-commit-hook" "$HOOK_TARGET"; then
       rm "$HOOK_TARGET"
       echo "Pre-commit hook removed."
       if [ -f "${HOOK_TARGET}.bak" ]; then
@@ -67,13 +67,13 @@ case "${1:-status}" in
         echo "Restored previous pre-commit hook from backup."
       fi
     else
-      echo "Link-checker pre-commit hook not found."
+      echo "uat pre-commit hook not found."
     fi
     ;;
 
   status)
-    if [ -f "$HOOK_TARGET" ] && grep -q "link-checker" "$HOOK_TARGET"; then
-      echo "Link-checker pre-commit hook is INSTALLED"
+    if [ -f "$HOOK_TARGET" ] && grep -q "uat-pre-commit-hook" "$HOOK_TARGET"; then
+      echo "uat pre-commit hook is INSTALLED"
       if [ "$(git config --bool hooks.linkcheck 2>/dev/null)" = "false" ]; then
         echo "  (DISABLED via git config)"
       fi
@@ -91,7 +91,7 @@ case "${1:-status}" in
         echo "  No .env file found. Set env vars directly or create .env in ${GIT_ROOT}"
       fi
     else
-      echo "Link-checker pre-commit hook is NOT installed"
+      echo "uat pre-commit hook is NOT installed"
       echo "  Run: ./setup-hooks.sh install"
     fi
     ;;

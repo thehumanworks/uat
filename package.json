@@ -1,7 +1,7 @@
 {
-  "name": "site-link-checker",
+  "name": "uat",
   "version": "1.0.0",
-  "description": "Crawls a website and reports broken links (404s, 5xx, timeouts)",
+  "description": "UI Automated Testing (uat) for websites",
   "scripts": {
     "check": "bun main.ts --base-url ${BASE_URL:?Set BASE_URL}",
     "check:local": "bun main.ts --base-url http://localhost:${PORT:-3000} --no-external",

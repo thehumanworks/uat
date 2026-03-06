@@ -1,6 +1,6 @@
-# Site Link Checker
+# uat
 
-Crawls any website, checks for broken links and UI issues.
+`uat` stands for UI Automated Testing. It crawls websites, checks for broken links, and reports browser-visible UI issues.
 
 ## Setup
 
@@ -16,6 +16,13 @@ bunx playwright install --with-deps chromium
 ```
 
 Requires [Bun](https://bun.sh). Playwright is only needed for `--browser` mode.
+
+## Documentation Layout
+
+- `docs/index.md` is the repository documentation entrypoint.
+- `docs/tasks/todo/` holds active task specs.
+- `docs/tasks/done/` archives completed task specs.
+- `docs/EXECPLAN.md` remains the living execution log for long-running work.
 
 ## Usage
 
@@ -107,7 +114,7 @@ Both files are written on every run. The `reports/` directory is gitignored.
 
 ## Pre-commit hook
 
-Runs the HTTP link checker against your local dev server before each commit. Skips cleanly if the dev server is not running.
+Runs the uat HTTP checker against your local dev server before each commit. Skips cleanly if the dev server is not running.
 
 ```bash
 ./setup-hooks.sh install    # install

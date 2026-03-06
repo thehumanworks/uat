@@ -1,4 +1,4 @@
-name: Post-Deploy Link Check
+name: Post-Deploy uat
 
 on:
   # Trigger after a deployment completes
@@ -23,7 +23,7 @@ env:
 
 jobs:
   link-check:
-    name: Link check (Production)
+    name: uat check (production)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Only run on successful deployments (skip pending/failure)
@@ -48,7 +48,7 @@ jobs:
         if: github.event_name == 'deployment_status'
         run: sleep 10
 
-      - name: Run link checker
+      - name: Run uat
         run: |
           echo "Checking: $BASE_URL"
           bun main.ts \
@@ -59,7 +59,7 @@ jobs:
             --exit-on-failure
 
   browser-check:
-    name: Browser check (Production)
+    name: uat browser check (production)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
@@ -86,7 +86,7 @@ jobs:
         if: github.event_name == 'deployment_status'
         run: sleep 10
 
-      - name: Run link + browser checker
+      - name: Run uat + browser checks
         run: |
           echo "Checking: $BASE_URL"
           bun main.ts \

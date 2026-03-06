@@ -1,4 +1,4 @@
-name: UAT Link Check
+name: uat UI Automated Testing
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ env:
 
 jobs:
   link-check:
-    name: Link check (UAT)
+    name: uat check
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -37,7 +37,7 @@ jobs:
           fi
           echo "Checking: $BASE_URL"
 
-      - name: Run link checker
+      - name: Run uat
         run: |
           bun main.ts \
             --base-url "$BASE_URL" \
@@ -47,7 +47,7 @@ jobs:
             --exit-on-failure
 
   browser-check:
-    name: Browser check (UAT)
+    name: uat browser check
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -70,7 +70,7 @@ jobs:
           fi
           echo "Checking: $BASE_URL"
 
-      - name: Run link + browser checker
+      - name: Run uat + browser checks
         run: |
           bun main.ts \
             --base-url "$BASE_URL" \
