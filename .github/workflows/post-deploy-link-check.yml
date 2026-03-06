@@ -1,0 +1,98 @@
+name: Post-Deploy Link Check
+
+on:
+  # Trigger after a deployment completes
+  deployment_status:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override base URL to check"
+        required: false
+        type: string
+  # Can also be triggered by other workflows
+  workflow_call:
+    inputs:
+      base_url:
+        description: "Base URL to check"
+        required: false
+        type: string
+
+env:
+  BASE_URL: ${{ inputs.base_url || secrets.PROD_BASE_URL }}
+
+jobs:
+  link-check:
+    name: Link check (Production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only run on successful deployments (skip pending/failure)
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Validate BASE_URL is set
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::BASE_URL is not set. Configure PROD_BASE_URL in GitHub Secrets or provide it via workflow_dispatch."
+            exit 1
+          fi
+
+      - name: Wait for deployment to stabilize
+        if: github.event_name == 'deployment_status'
+        run: sleep 10
+
+      - name: Run link checker
+        run: |
+          echo "Checking: $BASE_URL"
+          bun main.ts \
+            --base-url "$BASE_URL" \
+            --max-pages 300 \
+            --concurrency 5 \
+            --verbose \
+            --exit-on-failure
+
+  browser-check:
+    name: Browser check (Production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Validate BASE_URL is set
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::BASE_URL is not set. Configure PROD_BASE_URL in GitHub Secrets or provide it via workflow_dispatch."
+            exit 1
+          fi
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Wait for deployment to stabilize
+        if: github.event_name == 'deployment_status'
+        run: sleep 10
+
+      - name: Run link + browser checker
+        run: |
+          echo "Checking: $BASE_URL"
+          bun main.ts \
+            --base-url "$BASE_URL" \
+            --max-pages 300 \
+            --concurrency 5 \
+            --verbose \
+            --exit-on-failure \
+            --browser

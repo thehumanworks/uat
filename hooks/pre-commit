@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Pre-commit hook: runs the link checker against local dev server.
+#
+# Configuration (env vars or .env file):
+#   LINK_CHECK_PORT     - local dev server port (default: 3000)
+#   LINK_CHECK_DISABLED - set to "1" or "true" to skip this hook
+#   LINK_CHECK_MAX_PAGES - max pages to crawl (default: 50 for speed)
+#   LINK_CHECK_BROWSER  - set to "1" or "true" to enable Playwright browser checks (default: off, slow)
+#
+# To disable permanently:
+#   git config hooks.linkcheck false
+#   — or —
+#   LINK_CHECK_DISABLED=1 git commit ...
+#   — or —
+#   Remove with: ./setup-hooks.sh uninstall
+
+set -euo pipefail
+
+# Check for permanent disable via git config
+if [ "$(git config --bool hooks.linkcheck 2>/dev/null)" = "false" ]; then
+  exit 0
+fi
+
+# Check for env-based disable
+if [ "${LINK_CHECK_DISABLED:-}" = "1" ] || [ "${LINK_CHECK_DISABLED:-}" = "true" ]; then
+  exit 0
+fi
+
+# Load .env if present
+if [ -f .env ]; then
+  set -a && source .env && set +a
+fi
+
+PORT="${LINK_CHECK_PORT:-3000}"
+MAX_PAGES="${LINK_CHECK_MAX_PAGES:-50}"
+BROWSER_FLAG=""
+if [ "${LINK_CHECK_BROWSER:-}" = "1" ] || [ "${LINK_CHECK_BROWSER:-}" = "true" ]; then
+  BROWSER_FLAG="--browser"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Check if dev server is running
+if ! curl -s --head --connect-timeout 2 "http://localhost:${PORT}" > /dev/null 2>&1; then
+  echo "[link-checker] Dev server not running on port ${PORT} — skipping link check."
+  echo "[link-checker] Start your dev server and retry, or set LINK_CHECK_DISABLED=1 to skip."
+  exit 0
+fi
+
+echo "[link-checker] Checking local site on port ${PORT} (max ${MAX_PAGES} pages${BROWSER_FLAG:+, browser checks enabled})..."
+if ! bun "${SCRIPT_DIR}/main.ts" \
+  --base-url "http://localhost:${PORT}" \
+  --max-pages "${MAX_PAGES}" \
+  --no-external \
+  --concurrency 10 \
+  --exit-on-failure \
+  ${BROWSER_FLAG}; then
+  echo ""
+  echo "[link-checker] Broken links found! Fix them before committing."
+  echo "[link-checker] To skip this check: LINK_CHECK_DISABLED=1 git commit ..."
+  exit 1
+fi
+
+echo "[link-checker] All links OK."

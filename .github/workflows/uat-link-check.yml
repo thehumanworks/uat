@@ -1,0 +1,81 @@
+name: UAT Link Check
+
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override base URL to check"
+        required: false
+        type: string
+
+env:
+  # Set UAT_BASE_URL in GitHub repo secrets for your UAT environment.
+  # Example: https://uat.yoursite.com
+  BASE_URL: ${{ inputs.base_url || secrets.UAT_BASE_URL }}
+
+jobs:
+  link-check:
+    name: Link check (UAT)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Validate BASE_URL is set
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::BASE_URL is not set. Configure UAT_BASE_URL in GitHub Secrets or provide it via workflow_dispatch."
+            exit 1
+          fi
+          echo "Checking: $BASE_URL"
+
+      - name: Run link checker
+        run: |
+          bun main.ts \
+            --base-url "$BASE_URL" \
+            --max-pages 300 \
+            --concurrency 5 \
+            --verbose \
+            --exit-on-failure
+
+  browser-check:
+    name: Browser check (UAT)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Validate BASE_URL is set
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::error::BASE_URL is not set. Configure UAT_BASE_URL in GitHub Secrets or provide it via workflow_dispatch."
+            exit 1
+          fi
+          echo "Checking: $BASE_URL"
+
+      - name: Run link + browser checker
+        run: |
+          bun main.ts \
+            --base-url "$BASE_URL" \
+            --max-pages 300 \
+            --concurrency 5 \
+            --verbose \
+            --exit-on-failure \
+            --browser

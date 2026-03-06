@@ -1,0 +1,98 @@
+node_modules/
+reports/
+.DS_Store
+
+# Environment and secret files
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Local secrets and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+secrets.json
+.env.local
+.env.development
+.env.production
+# npm/pnpm/yarn/bun auth and credential files
+.npmrc
+.yarnrc
+.yarnrc.yml
+
+# TypeScript / JavaScript build artifacts
+dist/
+build/
+out/
+coverage/
+*.tsbuildinfo
+*.js.map
+*.d.ts.map
+
+# Package manager caches and lockfiles generated locally
+.npm/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.bun/
+.bun/install/cache/
+.pnpm-store/
+.parcel-cache/
+.turbo/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Test and tool caches
+.jest/
+.vitest/
+.eslintcache
+.stylelintcache
+.prettiercache
+.cache/
+.sass-cache/
+
+# IDE / editor local settings
+.vscode/
+.idea/
+*.iml
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+*~
+
+# OS generated files (macOS/Linux)
+Thumbs.db
+Desktop.ini
+Icon?
+.Spotlight-V100/
+.fseventsd/
+._*
+
+# Node/NPM/Yarn temp output
+tmp/
+temp/
+/.tmp/
+/.temp/
+
+# TypeScript transpiler and framework artifacts
+.next/
+.nuxt/
+.svelte-kit/
+.output/
